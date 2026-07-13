@@ -1,0 +1,18 @@
+# Copy this file to config.yaml and fill in your real values.
+# config.yaml is gitignored and will NOT be committed.
+
+database:
+  server: "YOUR_NAS_IP"
+  port: 1433
+  database: "FantasyFootball"
+  username: "sa"
+  password: "YOUR_SA_PASSWORD"
+  driver: "ODBC Driver 18 for SQL Server"
+  trust_cert: true
+
+ingestion:
+  # Seasons to pull on a full refresh
+  seasons:
+    - 2023
+    - 2024
+    - 2025

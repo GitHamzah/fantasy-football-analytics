@@ -1,0 +1,28 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# Config with real credentials
+config/config.yaml
+
+# IDE
+.vscode/
+*.code-workspace
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Power BI (binary, doesn't diff well)
+*.pbix
+*.pbit
+
+# Data files (don't commit raw data)
+data/
+*.csv
+*.parquet
