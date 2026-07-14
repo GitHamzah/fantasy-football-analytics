@@ -1,0 +1,38 @@
+name: 'fantasy_football'
+version: '1.0.0'
+
+profile: 'fantasy_football'
+
+# Where dbt looks for models, seeds, tests, etc.
+model-paths: ["models"]
+seed-paths: ["seeds"]
+test-paths: ["tests"]
+macro-paths: ["macros"]
+analysis-paths: ["analyses"]
+target-path: "target"
+clean-targets: ["target", "dbt_packages"]
+
+# Schema routing: each model folder maps to a database schema.
+# This is the key to our layered architecture:
+#   staging/   → staging schema
+#   warehouse/ → warehouse schema
+#   mart/      → mart schema
+models:
+  fantasy_football:
+    staging:
+      +schema: staging
+      +materialized: view
+    warehouse:
+      +schema: warehouse
+      +materialized: table
+    mart:
+      +schema: mart
+      +materialized: view
+
+# Seeds go into the warehouse schema (reference data)
+seeds:
+  fantasy_football:
+    +schema: warehouse
+
+flags:
+  dbt_sqlserver_use_native_string_types: true

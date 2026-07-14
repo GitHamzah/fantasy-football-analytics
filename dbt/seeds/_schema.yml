@@ -1,0 +1,37 @@
+version: 2
+
+seeds:
+  - name: scoring_formats
+    description: "Fantasy scoring format definitions. Standard, Half-PPR, and PPR."
+    config:
+      column_types:
+        format_name: varchar(20)
+        pts_per_reception: decimal(4,2)
+        pts_passing_yard: decimal(6,4)
+        pts_passing_td: decimal(4,1)
+        pts_interception: decimal(4,1)
+        pts_rushing_yard: decimal(6,4)
+        pts_rushing_td: decimal(4,1)
+        pts_receiving_yard: decimal(6,4)
+        pts_receiving_td: decimal(4,1)
+        pts_fumble_lost: decimal(4,1)
+        pts_2pt_conversion: decimal(4,1)
+    columns:
+      - name: format_name
+        tests:
+          - not_null
+          - unique
+
+  - name: positions
+    description: "Position reference data with fantasy relevance flags."
+    config:
+      column_types:
+        position_abbr: varchar(10)
+        position_name: varchar(50)
+        position_group: varchar(20)
+        is_fantasy_relevant: int
+    columns:
+      - name: position_abbr
+        tests:
+          - not_null
+          - unique

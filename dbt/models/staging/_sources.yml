@@ -1,0 +1,44 @@
+version: 2
+
+sources:
+  - name: raw
+    description: "Raw data landed by Python ingestion from nflverse. Do not transform here."
+    schema: raw
+    tables:
+      - name: players
+        description: "Full player universe — one row per player with bio, draft, and status info."
+        columns:
+          - name: gsis_id
+            description: "Primary player identifier from nflverse."
+            tests:
+              - not_null
+              - unique
+
+      - name: schedules
+        description: "NFL game schedules — one row per game with teams, scores, and metadata."
+        columns:
+          - name: game_id
+            description: "Unique game identifier from nflverse."
+            tests:
+              - not_null
+              - unique
+
+      - name: player_stats
+        description: "Weekly player stat lines — one row per player per week."
+        columns:
+          - name: player_id
+            description: "Player identifier (maps to gsis_id in players)."
+            tests:
+              - not_null:
+                  config:
+                    severity: warn
+
+      - name: rosters_weekly
+        description: "Weekly roster snapshots — one row per player per team per week."
+        columns:
+          - name: gsis_id
+            description: "Player identifier."
+            tests:
+              - not_null:
+                  config:
+                    severity: warn

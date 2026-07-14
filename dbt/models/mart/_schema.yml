@@ -1,0 +1,24 @@
+version: 2
+
+models:
+  - name: player_week_fantasy
+    description: >
+      Primary Power BI source. One row per player per week per scoring format.
+      Fantasy points are calculated here by cross-joining fact_player_week
+      with scoring_formats, so Standard, Half-PPR, and PPR are all available
+      as a single filterable column.
+    columns:
+      - name: gsis_id
+        description: "Player identifier."
+        tests:
+          - not_null
+      - name: scoring_format
+        description: "Fantasy scoring format: Standard, Half-PPR, or PPR."
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Standard', 'Half-PPR', 'PPR']
+      - name: fantasy_points
+        description: "Calculated fantasy points for this player-week-format combination."
+        tests:
+          - not_null

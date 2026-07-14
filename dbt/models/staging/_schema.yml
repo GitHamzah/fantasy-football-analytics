@@ -1,0 +1,41 @@
+version: 2
+
+models:
+  - name: stg_players
+    description: "Cleaned player universe. One row per player."
+    columns:
+      - name: gsis_id
+        description: "Primary player identifier."
+        tests:
+          - not_null
+          - unique
+
+  - name: stg_schedules
+    description: "Cleaned game schedules. One row per game."
+    columns:
+      - name: game_id
+        description: "Unique game identifier."
+        tests:
+          - not_null
+          - unique
+      - name: season
+        tests:
+          - not_null
+      - name: week
+        tests:
+          - not_null
+
+  - name: stg_player_stats
+    description: "Cleaned weekly player stat lines. One row per player per week."
+    columns:
+      - name: gsis_id
+        description: "Player identifier."
+        tests:
+          - not_null
+
+  - name: stg_rosters_weekly
+    description: "Cleaned weekly roster snapshots. One row per player per team per week."
+    columns:
+      - name: gsis_id
+        tests:
+          - not_null

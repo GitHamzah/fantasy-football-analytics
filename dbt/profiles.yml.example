@@ -1,0 +1,23 @@
+# EXAMPLE ONLY — Do NOT commit real credentials.
+#
+# Copy this pattern into your actual profiles.yml at:
+#   ~/.dbt/profiles.yml    (Windows: C:\Users\<you>\.dbt\profiles.yml)
+#
+# The password uses an environment variable so credentials stay out of files.
+# Set it before running dbt:
+#   Windows PowerShell:  $env:DBT_SQL_PASSWORD = "your_sa_password"
+#   Linux/Mac:           export DBT_SQL_PASSWORD=your_sa_password
+
+fantasy_football:
+  target: dev
+  outputs:
+    dev:
+      type: sqlserver
+      driver: "ODBC Driver 18 for SQL Server"
+      server: "YOUR_NAS_IP"
+      port: 1433
+      database: FantasyFootball
+      schema: staging
+      user: sa
+      password: "{{ env_var('DBT_SQL_PASSWORD') }}"
+      trust_cert: true

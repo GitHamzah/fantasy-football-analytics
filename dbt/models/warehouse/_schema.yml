@@ -1,0 +1,45 @@
+version: 2
+
+models:
+  - name: dim_player
+    description: "Player dimension. One row per player with bio and status."
+    columns:
+      - name: gsis_id
+        description: "Primary player identifier."
+        tests:
+          - not_null
+          - unique
+
+  - name: dim_team
+    description: "Team dimension. One row per team abbreviation."
+    columns:
+      - name: team_abbr
+        tests:
+          - not_null
+          - unique
+
+  - name: dim_week
+    description: "Week dimension. One row per season-week combination."
+    tests:
+      - unique:
+          column_name: "(CAST(season AS VARCHAR) + '-' + CAST(week AS VARCHAR))"
+
+  - name: dim_game
+    description: "Game dimension. One row per NFL game."
+    columns:
+      - name: game_id
+        tests:
+          - not_null
+          - unique
+
+  - name: fact_player_week
+    description: >
+      Core fact table at player-week grain. Contains raw stat components.
+      Fantasy points are calculated in the mart layer, not stored here.
+    columns:
+      - name: gsis_id
+        tests:
+          - not_null
+    tests:
+      - unique:
+          column_name: "(gsis_id + '-' + CAST(season AS VARCHAR) + '-' + CAST(week AS VARCHAR))"
