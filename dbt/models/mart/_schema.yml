@@ -1,24 +1,73 @@
 version: 2
 
 models:
-  - name: player_week_fantasy
+  - name: mart_dim_player
     description: >
-      Primary Power BI source. One row per player per week per scoring format.
-      Fantasy points are calculated here by cross-joining fact_player_week
-      with scoring_formats, so Standard, Half-PPR, and PPR are all available
-      as a single filterable column.
+      Player dimension for Power BI. One row per player.
+      Connected to fact_player_week via gsis_id.
     columns:
       - name: gsis_id
-        description: "Player identifier."
+        description: "Primary player identifier. PBI relationship key."
         tests:
           - not_null
-      - name: scoring_format
-        description: "Fantasy scoring format: Standard, Half-PPR, or PPR."
+          - unique
+
+  - name: mart_dim_team
+    description: >
+      Team dimension for Power BI. One row per team abbreviation.
+      Connected to fact_player_week via recent_team.
+    columns:
+      - name: team_abbr
+        description: "Team abbreviation. PBI relationship key."
         tests:
           - not_null
-          - accepted_values:
-              values: ['Standard', 'Half-PPR', 'PPR']
-      - name: fantasy_points
-        description: "Calculated fantasy points for this player-week-format combination."
+          - unique
+
+  - name: mart_dim_week
+    description: >
+      Week dimension for Power BI. One row per season-week.
+      Surrogate key (season * 100 + week) for single-column PBI relationship.
+    columns:
+      - name: week_key
+        description: "Surrogate key: season * 100 + week. PBI relationship key."
+        tests:
+          - not_null
+          - unique
+
+  - name: mart_dim_game
+    description: >
+      Game dimension for Power BI. One row per NFL game.
+      Connected to fact_player_week via game_id.
+    columns:
+      - name: game_id
+        description: "Unique game identifier. PBI relationship key."
+        tests:
+          - not_null
+          - unique
+
+  - name: mart_dim_scoring_format
+    description: >
+      Disconnected dimension for Power BI. NOT joined to the fact table.
+      Used as a slicer — DAX measures read the selected format's scoring
+      weights and calculate fantasy points dynamically.
+    columns:
+      - name: format_name
+        description: "Scoring format name. Used as PBI slicer value."
+        tests:
+          - not_null
+          - unique
+
+  - name: mart_fact_player_week
+    description: >
+      Core fact table for Power BI. One row per player per week.
+      Contains raw stat measures only. Fantasy points calculated in DAX
+      using the disconnected dim_scoring_format table.
+    columns:
+      - name: gsis_id
+        description: "Player identifier. FK to dim_player."
+        tests:
+          - not_null
+      - name: week_key
+        description: "Surrogate week key. FK to dim_week."
         tests:
           - not_null
