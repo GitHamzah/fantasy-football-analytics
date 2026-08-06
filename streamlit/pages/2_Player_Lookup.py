@@ -6,7 +6,8 @@ import plotly.express as px
 import plotly.graph_objects as go
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from utils.api import search_players, get_player, get_season_stats, get_weekly_stats, get_trajectory, compare_players
+from utils.api import (player_dropdown, get_player, get_season_stats,
+                        get_weekly_stats, get_trajectory, compare_players)
 
 st.set_page_config(page_title="Player Lookup", page_icon="🔍", layout="wide")
 st.title("🔍 Player Lookup")
@@ -17,30 +18,7 @@ scoring = scoring_map[scoring_label]
 compare_mode = st.sidebar.toggle("Compare Two Players", value=False)
 
 
-def player_search_widget(label: str, key_prefix: str):
-    """Reusable player search + dropdown selector. Returns (player_id, player_detail) or (None, None)."""
-    search = st.text_input(label, placeholder="Type a player name...", key=f"{key_prefix}_search")
-
-    if not search or len(search) < 2:
-        return None, None
-
-    results = search_players(search, limit=15)
-    if not results:
-        st.warning("No players found.")
-        return None, None
-
-    options = {
-        f"{p['player_name']} ({p['position']}, {p['current_team'] or 'FA'})": p["player_id"]
-        for p in results
-    }
-    selected = st.selectbox("Select player", list(options.keys()), key=f"{key_prefix}_select")
-    player_id = options[selected]
-    player = get_player(player_id)
-    return player_id, player
-
-
 def show_player_header(player: dict):
-    """Display player info header."""
     col1, col2, col3, col4, col5 = st.columns(5)
     col1.metric("Position", player.get("position", "—"))
     col2.metric("Team", player.get("current_team", "FA"))
@@ -50,7 +28,6 @@ def show_player_header(player: dict):
 
 
 def show_single_player(player_id: str, player: dict):
-    """Full single-player view with tabs."""
     show_player_header(player)
 
     tab_seasons, tab_weekly, tab_trajectory = st.tabs(["📊 Season Stats", "📅 Weekly Breakdown", "📈 Career Trajectory"])
@@ -139,8 +116,7 @@ def show_single_player(player_id: str, player: dict):
             fig = go.Figure()
             fig.add_trace(go.Scatter(
                 x=traj_df["season"], y=traj_df["ppg"], mode="lines+markers+text",
-                text=traj_df["ppg"], textposition="top center", name="PPG",
-                line=dict(width=3),
+                text=traj_df["ppg"], textposition="top center", name="PPG", line=dict(width=3),
             ))
             fig.update_layout(title="Fantasy PPG Trajectory", xaxis_title="Season",
                               yaxis_title="PPG", height=400)
@@ -168,8 +144,7 @@ def show_single_player(player_id: str, player: dict):
             st.info("No trajectory data available.")
 
 
-def show_comparison(pid_a: str, pid_b: str, player_a_detail: dict, player_b_detail: dict):
-    """Side-by-side comparison of two players."""
+def show_comparison(pid_a: str, pid_b: str):
     season = st.selectbox("Comparison Season", [2025, 2024, 2023, 2022, 2021], key="comp_season")
 
     with st.spinner("Comparing players..."):
@@ -204,7 +179,6 @@ def show_comparison(pid_a: str, pid_b: str, player_a_detail: dict, player_b_deta
                 st.metric("Recent PPG (Last 3)", f"{p['recent_ppg']:.1f}",
                            delta=f"{p['recent_ppg'] - p['ppg']:.1f} vs season")
 
-    # Weekly overlay chart
     st.markdown("---")
     weekly_a = get_weekly_stats(pid_a, season=season, scoring=scoring)
     weekly_b = get_weekly_stats(pid_b, season=season, scoring=scoring)
@@ -223,7 +197,6 @@ def show_comparison(pid_a: str, pid_b: str, player_a_detail: dict, player_b_deta
                           xaxis_title="Week", yaxis_title="Fantasy Points", height=450)
         st.plotly_chart(fig, use_container_width=True)
 
-    # Verdict
     ppg_diff = pa["ppg"] - pb["ppg"]
     if abs(ppg_diff) < 1.5:
         st.info(f"**Toss-up.** {pa['player_name']} ({pa['ppg']:.1f}) and {pb['player_name']} ({pb['ppg']:.1f}) "
@@ -236,23 +209,25 @@ def show_comparison(pid_a: str, pid_b: str, player_a_detail: dict, player_b_deta
                    f"Floor {pb['floor']:.1f} vs {pa['floor']:.1f}.")
 
 
-# ---- Main Page Logic ----
+# ---- Main ----
 
 if compare_mode:
     st.markdown("### Compare Two Players")
     col_a, col_b = st.columns(2)
     with col_a:
-        pid_a, player_a = player_search_widget("Player A", "a")
+        pid_a, name_a = player_dropdown("Player A", "lookup_a")
     with col_b:
-        pid_b, player_b = player_search_widget("Player B", "b")
+        pid_b, name_b = player_dropdown("Player B", "lookup_b")
 
-    if pid_a and pid_b and player_a and player_b:
+    if pid_a and pid_b:
         st.markdown("---")
-        show_comparison(pid_a, pid_b, player_a, player_b)
+        show_comparison(pid_a, pid_b)
     elif pid_a or pid_b:
-        st.info("Search and select both players to compare.")
+        st.info("Select both players to compare.")
 else:
-    pid, player = player_search_widget("Search for a player", "main")
-    if pid and player:
-        st.markdown("---")
-        show_single_player(pid, player)
+    pid, name = player_dropdown("Select a player", "lookup_main")
+    if pid:
+        player = get_player(pid)
+        if player:
+            st.markdown("---")
+            show_single_player(pid, player)

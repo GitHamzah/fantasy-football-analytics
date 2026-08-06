@@ -5,7 +5,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from utils.api import search_players, get_weekly_stats, compare_players
+from utils.api import player_dropdown, get_weekly_stats, compare_players
 
 st.set_page_config(page_title="Sit/Start Compare", page_icon="⚔️", layout="wide")
 st.title("⚔️ Sit/Start Compare")
@@ -20,34 +20,20 @@ scoring_label = st.sidebar.selectbox("Scoring Format", ["PPR", "Half-PPR", "Stan
 scoring = scoring_map[scoring_label]
 season = st.sidebar.selectbox("Season", [2025, 2024, 2023, 2022, 2021])
 
+# Position filter for dropdowns
+pos_filter = st.sidebar.selectbox("Filter by Position", ["All", "QB", "RB", "WR", "TE"])
+pos_val = None if pos_filter == "All" else pos_filter
+
 col_a, col_b = st.columns(2)
 
 with col_a:
-    search_a = st.text_input("Player A", placeholder="e.g. Jahmyr Gibbs", key="search_a")
+    pid_a, name_a = player_dropdown("Player A", "ss_a", position_filter=pos_val)
 with col_b:
-    search_b = st.text_input("Player B", placeholder="e.g. Bijan Robinson", key="search_b")
+    pid_b, name_b = player_dropdown("Player B", "ss_b", position_filter=pos_val)
 
-if not search_a or not search_b or len(search_a) < 2 or len(search_b) < 2:
-    st.info("Enter two player names above to compare.")
+if not pid_a or not pid_b:
+    st.info("Select two players above to compare.")
     st.stop()
-
-# Search and select
-results_a = search_players(search_a, limit=5)
-results_b = search_players(search_b, limit=5)
-
-if not results_a or not results_b:
-    st.warning("Could not find one or both players.")
-    st.stop()
-
-col_a2, col_b2 = st.columns(2)
-with col_a2:
-    opts_a = {f"{p['player_name']} ({p['position']}, {p['current_team'] or 'FA'})": p["player_id"] for p in results_a}
-    sel_a = st.selectbox("Select Player A", list(opts_a.keys()), key="sel_a")
-    pid_a = opts_a[sel_a]
-with col_b2:
-    opts_b = {f"{p['player_name']} ({p['position']}, {p['current_team'] or 'FA'})": p["player_id"] for p in results_b}
-    sel_b = st.selectbox("Select Player B", list(opts_b.keys()), key="sel_b")
-    pid_b = opts_b[sel_b]
 
 st.markdown("---")
 
@@ -56,7 +42,7 @@ with st.spinner("Comparing players..."):
     comparison = compare_players([pid_a, pid_b], season=season, scoring=scoring)
 
 if not comparison or len(comparison) < 2:
-    st.warning(f"Could not load comparison data for {season}. Both players need stats in this season.")
+    st.warning(f"Both players need stats in {season} to compare.")
     st.stop()
 
 comp_df = pd.DataFrame(comparison)
@@ -70,37 +56,23 @@ if player_a is None or player_b is None:
 # Summary cards
 col1, col2 = st.columns(2)
 
-with col1:
-    st.subheader(f"🅰️ {player_a['player_name']}")
-    st.caption(f"{player_a['position']} — {player_a['team']}")
-    m1, m2, m3 = st.columns(3)
-    m1.metric("PPG", f"{player_a['ppg']:.1f}")
-    m2.metric("Floor", f"{player_a['floor']:.1f}")
-    m3.metric("Ceiling", f"{player_a['ceiling']:.1f}")
-    m4, m5, m6 = st.columns(3)
-    m4.metric("Consistency", f"{player_a['consistency_score']:.2f}" if player_a['consistency_score'] else "—")
-    m5.metric("Boom Weeks", int(player_a["boom_weeks"]))
-    m6.metric("Bust Weeks", int(player_a["bust_weeks"]))
-    if player_a["recent_ppg"]:
-        st.metric("Recent PPG (Last 3)", f"{player_a['recent_ppg']:.1f}",
-                   delta=f"{player_a['recent_ppg'] - player_a['ppg']:.1f} vs season")
+for col, p, emoji in [(col1, player_a, "🅰️"), (col2, player_b, "🅱️")]:
+    with col:
+        st.subheader(f"{emoji} {p['player_name']}")
+        st.caption(f"{p['position']} — {p['team']}")
+        m1, m2, m3 = st.columns(3)
+        m1.metric("PPG", f"{p['ppg']:.1f}")
+        m2.metric("Floor", f"{p['floor']:.1f}")
+        m3.metric("Ceiling", f"{p['ceiling']:.1f}")
+        m4, m5, m6 = st.columns(3)
+        m4.metric("Consistency", f"{p['consistency_score']:.2f}" if p['consistency_score'] else "—")
+        m5.metric("Boom Weeks", int(p["boom_weeks"]))
+        m6.metric("Bust Weeks", int(p["bust_weeks"]))
+        if p["recent_ppg"]:
+            st.metric("Recent PPG (Last 3)", f"{p['recent_ppg']:.1f}",
+                       delta=f"{p['recent_ppg'] - p['ppg']:.1f} vs season")
 
-with col2:
-    st.subheader(f"🅱️ {player_b['player_name']}")
-    st.caption(f"{player_b['position']} — {player_b['team']}")
-    m1, m2, m3 = st.columns(3)
-    m1.metric("PPG", f"{player_b['ppg']:.1f}")
-    m2.metric("Floor", f"{player_b['floor']:.1f}")
-    m3.metric("Ceiling", f"{player_b['ceiling']:.1f}")
-    m4, m5, m6 = st.columns(3)
-    m4.metric("Consistency", f"{player_b['consistency_score']:.2f}" if player_b['consistency_score'] else "—")
-    m5.metric("Boom Weeks", int(player_b["boom_weeks"]))
-    m6.metric("Bust Weeks", int(player_b["bust_weeks"]))
-    if player_b["recent_ppg"]:
-        st.metric("Recent PPG (Last 3)", f"{player_b['recent_ppg']:.1f}",
-                   delta=f"{player_b['recent_ppg'] - player_b['ppg']:.1f} vs season")
-
-# Head-to-head weekly chart
+# Weekly overlay chart
 st.markdown("---")
 st.subheader("Week-by-Week Comparison")
 
@@ -114,13 +86,11 @@ if weekly_a and weekly_b:
     fig = go.Figure()
     fig.add_trace(go.Scatter(
         x=wa_df["week"], y=wa_df["fantasy_points"],
-        mode="lines+markers", name=player_a["player_name"],
-        line=dict(width=3),
+        mode="lines+markers", name=player_a["player_name"], line=dict(width=3),
     ))
     fig.add_trace(go.Scatter(
         x=wb_df["week"], y=wb_df["fantasy_points"],
-        mode="lines+markers", name=player_b["player_name"],
-        line=dict(width=3),
+        mode="lines+markers", name=player_b["player_name"], line=dict(width=3),
     ))
     fig.add_hline(y=20, line_dash="dot", line_color="green", annotation_text="Boom")
     fig.add_hline(y=8, line_dash="dot", line_color="orange", annotation_text="Bust")

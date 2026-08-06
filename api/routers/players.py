@@ -7,6 +7,32 @@ from models import PlayerSummary, PlayerDetail
 router = APIRouter(prefix="/players", tags=["Players"])
 
 
+@router.get("/fantasy-relevant", response_model=list[PlayerSummary])
+def get_fantasy_relevant_players(
+    min_season: int = Query(2024, description="Minimum season with stats"),
+):
+    """Get all fantasy-relevant players (those with stats in recent seasons).
+
+    Returns a compact list suitable for populating dropdown/selectbox widgets.
+    Typically 500-800 players.
+    """
+    rows = execute_query("""
+        SELECT DISTINCT
+            f.gsis_id           AS player_id,
+            f.display_name      AS player_name,
+            f.position,
+            f.position_group,
+            p.current_team
+        FROM mart.fact_player_week f
+        LEFT JOIN mart.dim_player p ON f.gsis_id = p.gsis_id
+        WHERE f.season >= :min_season
+          AND f.position IN ('QB', 'RB', 'WR', 'TE')
+        ORDER BY f.display_name
+    """, {"min_season": min_season})
+
+    return rows
+
+
 @router.get("/search", response_model=list[PlayerSummary])
 def search_players(
     q: str = Query(..., min_length=2, description="Player name search"),
