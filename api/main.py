@@ -6,7 +6,7 @@ waiver targets, and AI-powered analysis from a SQL Server warehouse.
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import players, stats, leaders, ai
+from routers import players, stats, leaders, ai, analytics
 
 app = FastAPI(
     title="Fantasy Football Analytics API",
@@ -33,6 +33,7 @@ app.add_middleware(
 app.include_router(players.router)
 app.include_router(stats.router)
 app.include_router(leaders.router)
+app.include_router(analytics.router)
 app.include_router(ai.router)
 
 
@@ -44,13 +45,4 @@ def root():
         "version": "1.0.0",
         "status": "healthy",
         "docs": "/docs",
-        "endpoints": {
-            "players": "/players/search?q=Lamar",
-            "player_detail": "/players/{player_id}",
-            "season_stats": "/stats/season/{player_id}",
-            "weekly_stats": "/stats/weekly/{player_id}?season=2024",
-            "season_leaders": "/leaders/season?season=2024",
-            "weekly_leaders": "/leaders/weekly?season=2024&week=1",
-            "ai_ask": "POST /ai/ask",
-        },
     }

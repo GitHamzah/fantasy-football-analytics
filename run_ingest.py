@@ -1,14 +1,14 @@
 """
-run_ingest.py — Phase 1 ingestion runner.
+run_ingest.py — Raw ingestion runner.
 
 Pulls nflverse data and lands it in the raw schema of FantasyFootball.
 Run from the project root with the venv activated:
 
     python run_ingest.py
 
-To ingest a specific season only:
+To ingest specific seasons:
 
-    python run_ingest.py --seasons 2024
+    python run_ingest.py --seasons 2024 2025 2026
 """
 
 import argparse
@@ -45,22 +45,44 @@ def main():
 
     # 1. Players (full universe, not season-specific)
     print("[1/4] Players")
-    ingest_players()
+    try:
+        ingest_players()
+    except Exception as e:
+        print(f"  ⚠ Players failed: {e}")
     print()
 
     # 2. Schedules
     print("[2/4] Schedules")
-    ingest_schedules(seasons)
+    try:
+        ingest_schedules(seasons)
+    except Exception as e:
+        print(f"  ⚠ Schedules failed: {e}")
     print()
 
-    # 3. Player stats (weekly)
+    # 3. Player stats (weekly) — may not exist for future seasons
     print("[3/4] Player Stats")
-    ingest_player_stats(seasons)
+    try:
+        ingest_player_stats(seasons)
+    except Exception as e:
+        print(f"  ⚠ Player Stats failed: {e}")
+        print(f"  Retrying without latest season...")
+        try:
+            ingest_player_stats(seasons[:-1])
+        except Exception as e2:
+            print(f"  ⚠ Retry also failed: {e2}")
     print()
 
     # 4. Weekly rosters
     print("[4/4] Rosters Weekly")
-    ingest_rosters_weekly(seasons)
+    try:
+        ingest_rosters_weekly(seasons)
+    except Exception as e:
+        print(f"  ⚠ Rosters Weekly failed: {e}")
+        print(f"  Retrying without latest season...")
+        try:
+            ingest_rosters_weekly(seasons[:-1])
+        except Exception as e2:
+            print(f"  ⚠ Retry also failed: {e2}")
     print()
 
     elapsed = time.time() - start
