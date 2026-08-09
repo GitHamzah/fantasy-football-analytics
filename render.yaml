@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: fantasy-football-api
+    runtime: python
+    buildCommand: pip install -r api/requirements.txt psycopg2-binary
+    startCommand: cd api && uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-2.5-flash
+      - key: APP_ENV
+        value: production

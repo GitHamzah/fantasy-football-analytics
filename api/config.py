@@ -1,11 +1,20 @@
-"""Application configuration loaded from environment variables."""
+"""Application configuration loaded from environment variables.
+
+Supports two database backends:
+- SQL Server (development): uses individual DB_* variables
+- Postgres/Neon (production): uses DATABASE_URL
+"""
 
 from pydantic_settings import BaseSettings
 from functools import lru_cache
 
 
 class Settings(BaseSettings):
-    # Database
+    # Production database URL (Neon Postgres)
+    # If set, this takes priority over SQL Server settings
+    database_url: str = ""
+
+    # SQL Server (development)
     db_server: str = "localhost"
     db_port: int = 1433
     db_name: str = "FantasyFootball"
@@ -15,13 +24,21 @@ class Settings(BaseSettings):
 
     # Google Gemini AI
     gemini_api_key: str = ""
-    gemini_model: str = "gemini-2.5-flash-preview"
+    gemini_model: str = "gemini-2.5-flash"
 
     # App
     app_env: str = "development"
 
     @property
-    def database_url(self) -> str:
+    def effective_database_url(self) -> str:
+        """Return the appropriate database URL based on environment.
+
+        If DATABASE_URL is set (production/Neon), use it.
+        Otherwise, build a SQL Server connection string (development).
+        """
+        if self.database_url:
+            return self.database_url
+
         import urllib.parse
         params = urllib.parse.quote_plus(
             f"DRIVER={{{self.db_driver}}};"
