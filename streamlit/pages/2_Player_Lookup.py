@@ -58,6 +58,7 @@ def show_single_player(player_id: str, player: dict):
                              labels={"season": "Season", "fantasy_ppg": "PPG"},
                              title=f"PPG by Season ({scoring_label})")
                 fig.update_traces(texttemplate="%{text:.1f}", textposition="outside")
+                fig.update_xaxes(dtick=1, tickformat="d")
                 st.plotly_chart(fig, use_container_width=True)
         else:
             st.info("No season stats available.")
@@ -120,6 +121,7 @@ def show_single_player(player_id: str, player: dict):
             ))
             fig.update_layout(title="Fantasy PPG Trajectory", xaxis_title="Season",
                               yaxis_title="PPG", height=400)
+            fig.update_xaxes(dtick=1, tickformat="d")
             st.plotly_chart(fig, use_container_width=True)
 
             if "opportunities_pg" in traj_df.columns:
@@ -128,6 +130,7 @@ def show_single_player(player_id: str, player: dict):
                 fig2.add_trace(go.Bar(x=traj_df["season"], y=traj_df["carries_pg"], name="Carries/G"))
                 fig2.update_layout(title="Opportunity Trend", xaxis_title="Season",
                                    yaxis_title="Per Game", barmode="stack", height=400)
+                fig2.update_xaxes(dtick=1, tickformat="d")
                 st.plotly_chart(fig2, use_container_width=True)
 
             traj_display = traj_df[["season", "team", "games_played", "total_points", "ppg",

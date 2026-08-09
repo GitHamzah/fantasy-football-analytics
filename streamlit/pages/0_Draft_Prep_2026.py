@@ -206,6 +206,7 @@ with tab_player_card:
                         ))
                     fig.update_layout(title="Career Arc + Projection",
                                       xaxis_title="Season", yaxis_title="PPG", height=350)
+                    fig.update_xaxes(dtick=1, tickformat="d")
                     st.plotly_chart(fig, use_container_width=True)
 
             # Schedule
