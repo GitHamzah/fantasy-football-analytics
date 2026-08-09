@@ -31,16 +31,22 @@ def _get(endpoint: str, params: dict = None) -> dict | list | None:
 
 
 def _post(endpoint: str, json_data: dict) -> dict | None:
-    try:
-        r = requests.post(f"{API_BASE}{endpoint}", json=json_data, timeout=30)
-        r.raise_for_status()
-        return r.json()
-    except requests.exceptions.ConnectionError:
-        st.error("Could not connect to the API. Is the FastAPI server running?")
-        return None
-    except requests.exceptions.HTTPError:
-        st.error("Request failed. Check the API logs.")
-        return None
+    url = f"{API_BASE}{endpoint}"
+    for attempt in range(3):
+        try:
+            r = requests.post(url, json=json_data, timeout=60)
+            r.raise_for_status()
+            return r.json()
+        except requests.exceptions.ConnectionError:
+            if attempt < 2:
+                import time
+                time.sleep(2)
+                continue
+            st.error(f"Could not connect to the API after 3 attempts.")
+            return None
+        except requests.exceptions.HTTPError:
+            st.error("Request failed. Check the API logs.")
+            return None
 
 
 # --- Player Dropdown ---
