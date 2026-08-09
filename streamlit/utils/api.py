@@ -10,18 +10,24 @@ except (FileNotFoundError, KeyError):
 
 
 def _get(endpoint: str, params: dict = None) -> dict | list | None:
-    try:
-        r = requests.get(f"{API_BASE}{endpoint}", params=params, timeout=15)
-        r.raise_for_status()
-        return r.json()
-    except requests.exceptions.ConnectionError:
-        st.error("Could not connect to the API. Is the FastAPI server running?")
-        return None
-    except requests.exceptions.HTTPError as e:
-        if e.response.status_code == 404:
+    url = f"{API_BASE}{endpoint}"
+    for attempt in range(3):
+        try:
+            r = requests.get(url, params=params, timeout=60)
+            r.raise_for_status()
+            return r.json()
+        except requests.exceptions.ConnectionError:
+            if attempt < 2:
+                import time
+                time.sleep(2)
+                continue
+            st.error(f"Could not connect to the API after 3 attempts. URL: {API_BASE}")
             return None
-        st.error(f"API error: {e.response.status_code}")
-        return None
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code == 404:
+                return None
+            st.error(f"API error: {e.response.status_code}")
+            return None
 
 
 def _post(endpoint: str, json_data: dict) -> dict | None:
