@@ -59,6 +59,22 @@ SELECT
     -- Special teams
     s.special_teams_tds,
 
+    -- Defensive
+    s.def_tackles_solo,
+    s.def_tackles_with_assist,
+    s.def_tackle_assists,
+    s.def_tackles_for_loss,
+    s.def_fumbles_forced,
+    s.def_sacks,
+    s.def_sack_yards,
+    s.def_qb_hits,
+    s.def_interceptions,
+    s.def_interception_yards,
+    s.def_pass_defended,
+    s.def_tds,
+    s.def_fumbles,
+    s.def_safeties,
+
     -- Source fantasy points (validation only)
     s.source_fantasy_points,
     s.source_fantasy_points_ppr

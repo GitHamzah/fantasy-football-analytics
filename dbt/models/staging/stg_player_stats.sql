@@ -58,6 +58,22 @@ SELECT
     -- Special teams
     CAST(ISNULL(special_teams_tds, 0) AS INT)        AS special_teams_tds,
 
+    -- Defensive
+    CAST(ISNULL(def_tackles_solo, 0) AS INT)             AS def_tackles_solo,
+    CAST(ISNULL(def_tackles_with_assist, 0) AS INT)      AS def_tackles_with_assist,
+    CAST(ISNULL(def_tackle_assists, 0) AS INT)           AS def_tackle_assists,
+    CAST(ISNULL(def_tackles_for_loss, 0) AS INT)         AS def_tackles_for_loss,
+    CAST(ISNULL(def_fumbles_forced, 0) AS INT)           AS def_fumbles_forced,
+    CAST(ISNULL(def_sacks, 0) AS DECIMAL(8,1))           AS def_sacks,
+    CAST(ISNULL(def_sack_yards, 0) AS DECIMAL(8,1))      AS def_sack_yards,
+    CAST(ISNULL(def_qb_hits, 0) AS INT)                  AS def_qb_hits,
+    CAST(ISNULL(def_interceptions, 0) AS INT)            AS def_interceptions,
+    CAST(ISNULL(def_interception_yards, 0) AS DECIMAL(8,1)) AS def_interception_yards,
+    CAST(ISNULL(def_pass_defended, 0) AS INT)            AS def_pass_defended,
+    CAST(ISNULL(def_tds, 0) AS INT)                      AS def_tds,
+    CAST(ISNULL(def_fumbles, 0) AS INT)                  AS def_fumbles,
+    CAST(ISNULL(def_safeties, 0) AS INT)                 AS def_safeties,
+
     -- Source fantasy points (kept for validation only)
     CAST(fantasy_points AS DECIMAL(8,2))              AS source_fantasy_points,
     CAST(fantasy_points_ppr AS DECIMAL(8,2))          AS source_fantasy_points_ppr

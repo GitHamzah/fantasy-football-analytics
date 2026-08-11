@@ -71,3 +71,16 @@ models:
         description: "Surrogate week key. FK to dim_week."
         tests:
           - not_null
+
+  - name: mart_team_defense
+    description: >
+      Team defensive quality metrics per season. Aggregated from individual
+      defensive player stats. Used for matchup analysis — pressure rate,
+      coverage quality, and playmaker frequency.
+    columns:
+      - name: team
+        tests:
+          - not_null
+      - name: season
+        tests:
+          - not_null
