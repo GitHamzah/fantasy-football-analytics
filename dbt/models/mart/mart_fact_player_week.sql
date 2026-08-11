@@ -65,6 +65,33 @@ SELECT
     -- Special teams
     f.special_teams_tds,
 
+    -- Defensive raw stats
+    f.def_tackles_solo,
+    f.def_tackles_with_assist,
+    f.def_tackle_assists,
+    f.def_tackles_for_loss,
+    f.def_fumbles_forced,
+    f.def_sacks,
+    f.def_sack_yards,
+    f.def_qb_hits,
+    f.def_interceptions,
+    f.def_interception_yards,
+    f.def_pass_defended,
+    f.def_tds,
+    f.def_fumbles,
+    f.def_safeties,
+
+    -- Computed defensive metrics
+    ISNULL(f.def_tackles_solo, 0) + ISNULL(f.def_tackle_assists, 0)
+                                             AS def_total_tackles,
+    ISNULL(f.def_sacks, 0) + ISNULL(f.def_interceptions, 0)
+        + ISNULL(f.def_fumbles_forced, 0) + ISNULL(f.def_tackles_for_loss, 0)
+                                             AS def_playmaker_plays,
+    ISNULL(f.def_qb_hits, 0) + ISNULL(f.def_sacks, 0)
+                                             AS def_pressures,
+    ISNULL(f.def_pass_defended, 0) + ISNULL(f.def_interceptions, 0)
+                                             AS def_coverage_plays,
+
     -- Pre-computed combined fields (saves DAX complexity)
     ISNULL(f.sack_fumbles_lost, 0)
         + ISNULL(f.rushing_fumbles_lost, 0)
