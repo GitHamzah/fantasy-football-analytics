@@ -33,6 +33,57 @@ def _detect_season(question: str) -> str:
     return "f.season = (SELECT MAX(season) FROM mart.fact_player_week)"
 
 
+def _detect_position(question: str) -> str | None:
+    """Detect a fantasy position from the question text."""
+    q = question.lower()
+    position_map = {
+        "quarterback": "QB", "qb": "QB",
+        "running back": "RB", "rb": "RB", "rusher": "RB",
+        "wide receiver": "WR", "wr": "WR", "receiver": "WR", "wideout": "WR",
+        "tight end": "TE", "te": "TE",
+        "kicker": "K", "k": "K",
+        "defense": "DEF", "dst": "DEF",
+    }
+    # Whole-word matches only, longest phrase first. Without word boundaries
+    # short aliases match inside ordinary words ("te" in "consistent"), and
+    # without the length ordering "te" would beat "kicker" and "tight end".
+    for phrase in sorted(position_map, key=len, reverse=True):
+        if re.search(rf"\b{re.escape(phrase)}\b", q):
+            return position_map[phrase]
+    return None
+
+
+# Capitalized words that start questions or act as superlatives — never player names.
+NON_NAME_WORDS = {
+    "Who", "What", "When", "Where", "Which", "How", "Any", "The", "Can",
+    "Does", "Did", "Should", "Would", "Could", "Is", "Are", "Was", "Were",
+    "Will", "Best", "Top", "Most", "Compare",
+}
+
+
+def _detect_player_name(question: str) -> str | None:
+    """Find a likely player name: 2+ consecutive capitalized words.
+
+    Requires a first+last name pattern like "Josh Allen" so that a single
+    capitalized word ("Any", "Who") cannot trigger a bogus player lookup.
+    """
+    # Keep periods, apostrophes and hyphens so "T.J.", "Ja'Marr" and
+    # "Amon-Ra" survive tokenization as single words.
+    tokens = re.findall(r"[A-Za-z][A-Za-z.'\-]*", question)
+
+    best: list[str] = []
+    run: list[str] = []
+    for token in tokens:
+        if len(token) > 1 and token[0].isupper() and token not in NON_NAME_WORDS:
+            run.append(token)
+            if len(run) > len(best):
+                best = list(run)
+        else:
+            run = []
+
+    return " ".join(best) if len(best) >= 2 else None
+
+
 def _get_relevant_data(question: str) -> str:
     """Pull relevant data based on keywords in the question.
 
@@ -42,46 +93,49 @@ def _get_relevant_data(question: str) -> str:
     question_lower = question.lower()
     context_parts = []
     season_filter = _detect_season(question)
+    position = _detect_position(question)
+    position_filter = f"\n              AND f.position = '{position}'" if position else ""
 
     # Pull top season leaders
     try:
         leaders = execute_query(f"""
-            SELECT TOP 20
+            SELECT
                 f.display_name,
                 f.position,
                 f.recent_team,
                 f.season,
                 COUNT(*)                    AS games,
                 CAST(SUM(
-                    ISNULL(f.passing_yards, 0) * 0.04
-                  + ISNULL(f.passing_tds, 0) * 4.0
-                  + ISNULL(f.interceptions, 0) * -2.0
-                  + ISNULL(f.rushing_yards, 0) * 0.1
-                  + ISNULL(f.rushing_tds, 0) * 6.0
-                  + ISNULL(f.receptions, 0) * 0.5
-                  + ISNULL(f.receiving_yards, 0) * 0.1
-                  + ISNULL(f.receiving_tds, 0) * 6.0
-                  + ISNULL(f.total_fumbles_lost, 0) * -2.0
-                  + ISNULL(f.special_teams_tds, 0) * 6.0
+                    COALESCE(f.passing_yards, 0) * 0.04
+                  + COALESCE(f.passing_tds, 0) * 4.0
+                  + COALESCE(f.interceptions, 0) * -2.0
+                  + COALESCE(f.rushing_yards, 0) * 0.1
+                  + COALESCE(f.rushing_tds, 0) * 6.0
+                  + COALESCE(f.receptions, 0) * 0.5
+                  + COALESCE(f.receiving_yards, 0) * 0.1
+                  + COALESCE(f.receiving_tds, 0) * 6.0
+                  + COALESCE(f.total_fumbles_lost, 0) * -2.0
+                  + COALESCE(f.special_teams_tds, 0) * 6.0
                 ) AS DECIMAL(10,1))         AS half_ppr_pts,
                 CAST(SUM(
-                    ISNULL(f.passing_yards, 0) * 0.04
-                  + ISNULL(f.passing_tds, 0) * 4.0
-                  + ISNULL(f.interceptions, 0) * -2.0
-                  + ISNULL(f.rushing_yards, 0) * 0.1
-                  + ISNULL(f.rushing_tds, 0) * 6.0
-                  + ISNULL(f.receptions, 0) * 0.5
-                  + ISNULL(f.receiving_yards, 0) * 0.1
-                  + ISNULL(f.receiving_tds, 0) * 6.0
-                  + ISNULL(f.total_fumbles_lost, 0) * -2.0
-                  + ISNULL(f.special_teams_tds, 0) * 6.0
+                    COALESCE(f.passing_yards, 0) * 0.04
+                  + COALESCE(f.passing_tds, 0) * 4.0
+                  + COALESCE(f.interceptions, 0) * -2.0
+                  + COALESCE(f.rushing_yards, 0) * 0.1
+                  + COALESCE(f.rushing_tds, 0) * 6.0
+                  + COALESCE(f.receptions, 0) * 0.5
+                  + COALESCE(f.receiving_yards, 0) * 0.1
+                  + COALESCE(f.receiving_tds, 0) * 6.0
+                  + COALESCE(f.total_fumbles_lost, 0) * -2.0
+                  + COALESCE(f.special_teams_tds, 0) * 6.0
                 ) / NULLIF(COUNT(*), 0) AS DECIMAL(10,1))
                                             AS ppg
             FROM mart.fact_player_week f
             WHERE {season_filter}
-              AND f.season_type = 'REG'
+              AND f.season_type = 'REG'{position_filter}
             GROUP BY f.display_name, f.position, f.recent_team, f.season
             ORDER BY half_ppr_pts DESC
+            OFFSET 0 ROWS FETCH NEXT 20 ROWS ONLY
         """)
         if leaders:
             season = leaders[0]["season"]
@@ -90,38 +144,40 @@ def _get_relevant_data(question: str) -> str:
                 f"{r['half_ppr_pts']} pts, {r['ppg']} ppg, {r['games']} games"
                 for r in leaders
             ]
+            scope = f"{position} " if position else ""
             context_parts.append(
-                f"Top 20 Half-PPR scorers for {season} regular season:\n"
+                f"Top 20 {scope}Half-PPR scorers for {season} regular season:\n"
                 + "\n".join(leader_lines)
             )
-    except Exception:
-        pass
+    except Exception as e:
+        import traceback
+        print(f"AI data retrieval error: {e}")
+        traceback.print_exc()
 
     # If question mentions a player name, try to find their stats
-    words = question.split()
-    potential_names = [w for w in words if w[0:1].isupper() and len(w) > 2]
-    if potential_names:
-        name_search = " ".join(potential_names)
+    name_search = _detect_player_name(question)
+    if name_search:
         try:
             player_stats = execute_query("""
-                SELECT TOP 5
+                SELECT
                     f.display_name,
                     f.position,
                     f.recent_team,
                     f.season,
                     f.week,
                     f.opponent_team,
-                    ISNULL(f.passing_yards, 0)   AS pass_yds,
-                    ISNULL(f.passing_tds, 0)     AS pass_td,
-                    ISNULL(f.rushing_yards, 0)   AS rush_yds,
-                    ISNULL(f.rushing_tds, 0)     AS rush_td,
-                    ISNULL(f.receptions, 0)      AS rec,
-                    ISNULL(f.receiving_yards, 0) AS rec_yds,
-                    ISNULL(f.receiving_tds, 0)   AS rec_td,
-                    ISNULL(f.targets, 0)         AS tgt
+                    COALESCE(f.passing_yards, 0)   AS pass_yds,
+                    COALESCE(f.passing_tds, 0)     AS pass_td,
+                    COALESCE(f.rushing_yards, 0)   AS rush_yds,
+                    COALESCE(f.rushing_tds, 0)     AS rush_td,
+                    COALESCE(f.receptions, 0)      AS rec,
+                    COALESCE(f.receiving_yards, 0) AS rec_yds,
+                    COALESCE(f.receiving_tds, 0)   AS rec_td,
+                    COALESCE(f.targets, 0)         AS tgt
                 FROM mart.fact_player_week f
                 WHERE f.display_name LIKE :name
                 ORDER BY f.season DESC, f.week DESC
+                OFFSET 0 ROWS FETCH NEXT 5 ROWS ONLY
             """, {"name": f"%{name_search}%"})
             if player_stats:
                 name = player_stats[0]["display_name"]
@@ -136,8 +192,10 @@ def _get_relevant_data(question: str) -> str:
                     f"Recent game log for {name} ({player_stats[0]['position']}, {player_stats[0]['recent_team']}):\n"
                     + "\n".join(lines)
                 )
-        except Exception:
-            pass
+        except Exception as e:
+            import traceback
+            print(f"AI data retrieval error: {e}")
+            traceback.print_exc()
 
     # Check for waiver/trending keywords
     if any(kw in question_lower for kw in ["waiver", "pickup", "trending", "breakout", "rising"]):
@@ -151,15 +209,15 @@ def _get_relevant_data(question: str) -> str:
                         f.recent_team,
                         f.season,
                         AVG(
-                            ISNULL(f.passing_yards, 0) * 0.04
-                          + ISNULL(f.passing_tds, 0) * 4.0
-                          + ISNULL(f.interceptions, 0) * -2.0
-                          + ISNULL(f.rushing_yards, 0) * 0.1
-                          + ISNULL(f.rushing_tds, 0) * 6.0
-                          + ISNULL(f.receptions, 0) * 0.5
-                          + ISNULL(f.receiving_yards, 0) * 0.1
-                          + ISNULL(f.receiving_tds, 0) * 6.0
-                          + ISNULL(f.total_fumbles_lost, 0) * -2.0
+                            COALESCE(f.passing_yards, 0) * 0.04
+                          + COALESCE(f.passing_tds, 0) * 4.0
+                          + COALESCE(f.interceptions, 0) * -2.0
+                          + COALESCE(f.rushing_yards, 0) * 0.1
+                          + COALESCE(f.rushing_tds, 0) * 6.0
+                          + COALESCE(f.receptions, 0) * 0.5
+                          + COALESCE(f.receiving_yards, 0) * 0.1
+                          + COALESCE(f.receiving_tds, 0) * 6.0
+                          + COALESCE(f.total_fumbles_lost, 0) * -2.0
                         ) AS recent_ppg
                     FROM mart.fact_player_week f
                     WHERE {season_filter}
@@ -172,22 +230,22 @@ def _get_relevant_data(question: str) -> str:
                     SELECT
                         f.gsis_id,
                         AVG(
-                            ISNULL(f.passing_yards, 0) * 0.04
-                          + ISNULL(f.passing_tds, 0) * 4.0
-                          + ISNULL(f.interceptions, 0) * -2.0
-                          + ISNULL(f.rushing_yards, 0) * 0.1
-                          + ISNULL(f.rushing_tds, 0) * 6.0
-                          + ISNULL(f.receptions, 0) * 0.5
-                          + ISNULL(f.receiving_yards, 0) * 0.1
-                          + ISNULL(f.receiving_tds, 0) * 6.0
-                          + ISNULL(f.total_fumbles_lost, 0) * -2.0
+                            COALESCE(f.passing_yards, 0) * 0.04
+                          + COALESCE(f.passing_tds, 0) * 4.0
+                          + COALESCE(f.interceptions, 0) * -2.0
+                          + COALESCE(f.rushing_yards, 0) * 0.1
+                          + COALESCE(f.rushing_tds, 0) * 6.0
+                          + COALESCE(f.receptions, 0) * 0.5
+                          + COALESCE(f.receiving_yards, 0) * 0.1
+                          + COALESCE(f.receiving_tds, 0) * 6.0
+                          + COALESCE(f.total_fumbles_lost, 0) * -2.0
                         ) AS season_ppg
                     FROM mart.fact_player_week f
                     WHERE {season_filter}
                       AND f.position IN ('QB','RB','WR','TE')
                     GROUP BY f.gsis_id
                 )
-                SELECT TOP 15
+                SELECT
                     r.display_name,
                     r.position,
                     r.recent_team,
@@ -198,6 +256,7 @@ def _get_relevant_data(question: str) -> str:
                 JOIN full_season fs ON r.gsis_id = fs.gsis_id
                 WHERE r.recent_ppg > 10
                 ORDER BY (r.recent_ppg - fs.season_ppg) DESC
+                OFFSET 0 ROWS FETCH NEXT 15 ROWS ONLY
             """)
             if trending:
                 lines = [
@@ -210,8 +269,10 @@ def _get_relevant_data(question: str) -> str:
                     "Trending up (recent 3 weeks vs full season):\n"
                     + "\n".join(lines)
                 )
-        except Exception:
-            pass
+        except Exception as e:
+            import traceback
+            print(f"AI data retrieval error: {e}")
+            traceback.print_exc()
 
     # Available seasons
     try:
@@ -220,8 +281,10 @@ def _get_relevant_data(question: str) -> str:
         """)
         season_list = [str(s["season"]) for s in seasons]
         context_parts.append(f"Available seasons in the database: {', '.join(season_list)}")
-    except Exception:
-        pass
+    except Exception as e:
+        import traceback
+        print(f"AI data retrieval error: {e}")
+        traceback.print_exc()
 
     return "\n\n".join(context_parts) if context_parts else "No relevant data found."
 

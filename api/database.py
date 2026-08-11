@@ -49,12 +49,17 @@ def execute_query(query: str, params: dict = None) -> list[dict]:
 
         # Convert TOP N to LIMIT N
         import re
+
+        def _limit_token(tok: str) -> str:
+            """A numeric row count stays a literal; anything else is a bind param."""
+            return tok if tok.isdigit() else f":{tok}"
+
         top_match = re.search(r'SELECT\s+TOP\s*\(?\s*:?(\w+)\s*\)?', query, re.IGNORECASE)
         if top_match:
             limit_param = top_match.group(1)
             query = re.sub(r'SELECT\s+TOP\s*\(?\s*:?\w+\s*\)?', 'SELECT', query, count=1, flags=re.IGNORECASE)
             # Add LIMIT at the end (before any trailing whitespace)
-            query = query.rstrip() + f" LIMIT :{limit_param}" if limit_param.isalpha() else query.rstrip() + f" LIMIT {limit_param}"
+            query = query.rstrip() + f" LIMIT {_limit_token(limit_param)}"
 
         # Convert OFFSET...FETCH to LIMIT...OFFSET
         fetch_match = re.search(r'OFFSET\s+(\d+)\s+ROWS\s+FETCH\s+NEXT\s+:?(\w+)\s+ROWS\s+ONLY', query, re.IGNORECASE)
@@ -63,7 +68,7 @@ def execute_query(query: str, params: dict = None) -> list[dict]:
             limit_param = fetch_match.group(2)
             query = re.sub(
                 r'OFFSET\s+\d+\s+ROWS\s+FETCH\s+NEXT\s+:?\w+\s+ROWS\s+ONLY',
-                f"LIMIT :{limit_param} OFFSET {offset_val}",
+                f"LIMIT {_limit_token(limit_param)} OFFSET {offset_val}",
                 query, flags=re.IGNORECASE
             )
 
