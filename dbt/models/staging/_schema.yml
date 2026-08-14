@@ -39,3 +39,35 @@ models:
       - name: gsis_id
         tests:
           - not_null
+
+  - name: stg_pfr_pass
+    description: "Cleaned PFR advanced passing stats. One row per passer per week."
+    columns:
+      - name: pfr_player_id
+        description: "PFR player identifier. Does not join to gsis_id."
+        tests:
+          - not_null
+
+  - name: stg_pfr_rush
+    description: "Cleaned PFR advanced rushing stats. One row per rusher per week."
+    columns:
+      - name: pfr_player_id
+        description: "PFR player identifier. Does not join to gsis_id."
+        tests:
+          - not_null
+
+  - name: stg_pfr_rec
+    description: "Cleaned PFR advanced receiving stats. One row per receiver per week."
+    columns:
+      - name: pfr_player_id
+        description: "PFR player identifier. Does not join to gsis_id."
+        tests:
+          - not_null
+
+  - name: stg_pfr_def
+    description: "Cleaned PFR advanced defensive stats. One row per defender per week."
+    columns:
+      - name: pfr_player_id
+        description: "PFR player identifier. Does not join to gsis_id."
+        tests:
+          - not_null

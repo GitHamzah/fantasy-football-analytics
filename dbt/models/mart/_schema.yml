@@ -72,6 +72,21 @@ models:
         tests:
           - not_null
 
+  - name: mart_pfr_advstats
+    description: >
+      Pro Football Reference advanced stats for Power BI. One row per player
+      per week, combining passing, rushing, receiving and defensive measures.
+      Keyed on pfr_player_id, which does not relate to gsis_id — this table is
+      not directly joinable to fact_player_week.
+    columns:
+      - name: pfr_player_id
+        tests:
+          - not_null
+      - name: week_key
+        description: "Surrogate week key: season * 100 + week."
+        tests:
+          - not_null
+
   - name: mart_team_defense
     description: >
       Team defensive quality metrics per season. Aggregated from individual

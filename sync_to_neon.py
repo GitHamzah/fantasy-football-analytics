@@ -51,6 +51,7 @@ MART_TABLES = [
     ("mart.dim_scoring_format", "dim_scoring_format"),
     ("mart.fact_player_week", "fact_player_week"),
     ("mart.team_defense", "team_defense"),
+    ("mart.pfr_advstats", "pfr_advstats"),
 ]
 
 
