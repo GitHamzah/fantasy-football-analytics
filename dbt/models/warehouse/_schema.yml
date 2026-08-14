@@ -43,3 +43,24 @@ models:
     tests:
       - unique:
           column_name: "(gsis_id + '-' + CAST(season AS VARCHAR) + '-' + CAST(week AS VARCHAR))"
+
+  - name: fact_pfr_advstats
+    description: >
+      Pro Football Reference advanced stats unified at player-week grain.
+      Combines the passing, rushing, receiving and defensive PFR feeds, each of
+      which covers a different population, so most columns are sparse by design.
+      Keyed on pfr_player_id, which does NOT join to gsis_id.
+    columns:
+      - name: pfr_player_id
+        description: "PFR player identifier. Not interchangeable with gsis_id."
+        tests:
+          - not_null
+      - name: season
+        tests:
+          - not_null
+      - name: week
+        tests:
+          - not_null
+    tests:
+      - unique:
+          column_name: "(pfr_player_id + '-' + CAST(season AS VARCHAR) + '-' + CAST(week AS VARCHAR))"

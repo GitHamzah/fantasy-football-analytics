@@ -42,3 +42,43 @@ sources:
               - not_null:
                   config:
                     severity: warn
+
+      - name: pfr_pass
+        description: "Pro Football Reference advanced passing stats — one row per passer per week."
+        columns:
+          - name: pfr_player_id
+            description: "PFR player identifier. Not the same as gsis_id."
+            tests:
+              - not_null:
+                  config:
+                    severity: warn
+
+      - name: pfr_rush
+        description: "Pro Football Reference advanced rushing stats — one row per rusher per week."
+        columns:
+          - name: pfr_player_id
+            description: "PFR player identifier. Not the same as gsis_id."
+            tests:
+              - not_null:
+                  config:
+                    severity: warn
+
+      - name: pfr_rec
+        description: "Pro Football Reference advanced receiving stats — one row per receiver per week."
+        columns:
+          - name: pfr_player_id
+            description: "PFR player identifier. Not the same as gsis_id."
+            tests:
+              - not_null:
+                  config:
+                    severity: warn
+
+      - name: pfr_def
+        description: "Pro Football Reference advanced defensive stats — one row per defender per week."
+        columns:
+          - name: pfr_player_id
+            description: "PFR player identifier. Not the same as gsis_id."
+            tests:
+              - not_null:
+                  config:
+                    severity: warn
