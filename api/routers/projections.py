@@ -16,11 +16,15 @@ def get_projections(
 ):
     """Projected fantasy rankings for the target season.
 
-    Uses weighted historical averages (recent seasons weighted higher),
-    age curve adjustments, and availability projections.
+    Uses a trained gradient boosting model when one is available (PPR scoring
+    only), otherwise weighted historical averages with age curve adjustments.
+    Each row's `method` field reports which was used: "ml" or "weighted_avg".
     """
+    # Pull a wide pool first. Applying the caller's limit here would truncate
+    # before the position filter runs, so ?position=RB&limit=5 would come back
+    # empty whenever the top 5 overall happen to be QBs.
     projections = get_player_projections(
-        target_season=season, scoring=scoring, min_games=min_games, limit=limit,
+        target_season=season, scoring=scoring, min_games=min_games, limit=500,
     )
 
     if position:
@@ -29,7 +33,7 @@ def get_projections(
         for i, p in enumerate(projections, 1):
             p["pos_rank"] = i
 
-    return projections
+    return projections[:limit]
 
 
 @router.get("/schedule")
