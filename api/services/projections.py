@@ -1,11 +1,19 @@
 """Projection engine — builds fantasy projections for the upcoming season.
 
-Uses weighted historical averages, age curves, and schedule difficulty
-to project fantasy performance for the next season.
+Prefers a trained scikit-learn model (see services/ml_projections.py). When no
+model artifact is present — or the request asks for a scoring format the model
+was not trained on — it falls back to the original weighted historical average
+with age curves. Every projection carries a `method` field of "ml" or
+"weighted_avg" so callers can tell which produced it.
 """
 
 from database import execute_query
 from datetime import date
+
+
+# The ML model is trained on PPR scoring. Other formats fall back to the
+# weighted average, which applies the requested reception value directly.
+_ML_SCORING = "ppr"
 
 
 # Age curve multipliers by position
@@ -35,7 +43,76 @@ def get_player_projections(
 ) -> list[dict]:
     """Generate fantasy projections for the target season.
 
-    Methodology:
+    Uses the trained ML model when one is available and the request is for PPR
+    scoring; otherwise falls back to the weighted-average engine. The response
+    shape is identical either way, with `method` recording which was used.
+    """
+    if scoring == _ML_SCORING:
+        try:
+            from services.ml_projections import model_exists, predict_next_season
+
+            if model_exists():
+                ml_rows = predict_next_season(
+                    target_season=target_season,
+                    limit=limit,
+                    min_games=min_games,
+                )
+                if ml_rows:
+                    return _finalise(_to_projection_shape(ml_rows), limit)
+        except Exception as e:
+            import traceback
+            print(f"ML projection failed, falling back to weighted average: {e}")
+            traceback.print_exc()
+
+    return _weighted_average_projections(target_season, scoring, min_games, limit)
+
+
+def _to_projection_shape(ml_rows: list[dict]) -> list[dict]:
+    """Map ml_projections output onto the engine's public response shape."""
+    out = []
+    for r in ml_rows:
+        out.append({
+            "player_id": r["player_id"],
+            "player_name": r["player_name"],
+            "position": r["position"],
+            "team": r["team"],
+            "age": r["age"],
+            "projected_ppg": r["predicted_ppg"],
+            "projected_games": r["predicted_games"],
+            "projected_total": r["predicted_total"],
+            # No age multiplier under the ML model — age is a model feature
+            # rather than a post-hoc adjustment.
+            "age_multiplier": None,
+            "base_ppg": r["last_season_ppg"],
+            "opportunities_pg": None,
+            "last_season_ppg": r["last_season_ppg"],
+            "last_season_games": r["last_season_games"],
+            "seasons_of_data": None,
+            "method": "ml",
+        })
+    return out
+
+
+def _finalise(projections: list[dict], limit: int) -> list[dict]:
+    """Sort, trim and attach overall/positional ranks."""
+    projections.sort(key=lambda x: x["projected_total"], reverse=True)
+    pos_counters: dict[str, int] = {}
+    for i, p in enumerate(projections[:limit], 1):
+        p["overall_rank"] = i
+        pos = p["position"]
+        pos_counters[pos] = pos_counters.get(pos, 0) + 1
+        p["pos_rank"] = pos_counters[pos]
+    return projections[:limit]
+
+
+def _weighted_average_projections(
+    target_season: int = 2026,
+    scoring: str = "ppr",
+    min_games: int = 6,
+    limit: int = 150,
+) -> list[dict]:
+    """Original projection methodology, used when the ML model is unavailable.
+
     1. Weighted historical PPG (most recent season weighted highest)
     2. Age curve adjustment
     3. Games played projection based on historical availability
@@ -54,23 +131,23 @@ def get_player_projections(
             f.season,
             COUNT(*)                                    AS games,
             CAST(AVG(
-                ISNULL(f.passing_yards, 0) * 0.04
-              + ISNULL(f.passing_tds, 0) * 4.0
-              + ISNULL(f.interceptions, 0) * -2.0
-              + ISNULL(f.rushing_yards, 0) * 0.1
-              + ISNULL(f.rushing_tds, 0) * 6.0
-              + ISNULL(f.receptions, 0) * :ppr
-              + ISNULL(f.receiving_yards, 0) * 0.1
-              + ISNULL(f.receiving_tds, 0) * 6.0
-              + ISNULL(f.total_fumbles_lost, 0) * -2.0
-              + ISNULL(f.total_2pt_conversions, 0) * 2.0
-              + ISNULL(f.special_teams_tds, 0) * 6.0
+                COALESCE(f.passing_yards, 0) * 0.04
+              + COALESCE(f.passing_tds, 0) * 4.0
+              + COALESCE(f.interceptions, 0) * -2.0
+              + COALESCE(f.rushing_yards, 0) * 0.1
+              + COALESCE(f.rushing_tds, 0) * 6.0
+              + COALESCE(f.receptions, 0) * :ppr
+              + COALESCE(f.receiving_yards, 0) * 0.1
+              + COALESCE(f.receiving_tds, 0) * 6.0
+              + COALESCE(f.total_fumbles_lost, 0) * -2.0
+              + COALESCE(f.total_2pt_conversions, 0) * 2.0
+              + COALESCE(f.special_teams_tds, 0) * 6.0
             ) AS DECIMAL(10,2))                         AS ppg,
-            CAST(AVG(ISNULL(f.targets, 0) + ISNULL(f.carries, 0))
+            CAST(AVG(COALESCE(f.targets, 0) + COALESCE(f.carries, 0))
                 AS DECIMAL(10,1))                       AS opportunities_pg,
-            CAST(AVG(ISNULL(f.targets, 0)) AS DECIMAL(10,1)) AS targets_pg,
-            CAST(AVG(ISNULL(f.carries, 0)) AS DECIMAL(10,1)) AS carries_pg,
-            CAST(AVG(ISNULL(f.receptions, 0)) AS DECIMAL(10,1)) AS receptions_pg
+            CAST(AVG(COALESCE(f.targets, 0)) AS DECIMAL(10,1)) AS targets_pg,
+            CAST(AVG(COALESCE(f.carries, 0)) AS DECIMAL(10,1)) AS carries_pg,
+            CAST(AVG(COALESCE(f.receptions, 0)) AS DECIMAL(10,1)) AS receptions_pg
         FROM mart.fact_player_week f
         WHERE f.season BETWEEN :start_season AND :end_season
           AND f.season_type = 'REG'
@@ -186,20 +263,10 @@ def get_player_projections(
             "last_season_ppg": float(latest["ppg"]),
             "last_season_games": int(latest["games"]),
             "seasons_of_data": seasons_played,
+            "method": "weighted_avg",
         })
 
-    # Sort by projected total
-    projections.sort(key=lambda x: x["projected_total"], reverse=True)
-
-    # Add overall rank and position rank
-    pos_counters = {}
-    for i, p in enumerate(projections[:limit], 1):
-        p["overall_rank"] = i
-        pos = p["position"]
-        pos_counters[pos] = pos_counters.get(pos, 0) + 1
-        p["pos_rank"] = pos_counters[pos]
-
-    return projections[:limit]
+    return _finalise(projections, limit)
 
 
 def get_schedule_difficulty(
@@ -220,15 +287,15 @@ def get_schedule_difficulty(
             f.opponent_team                             AS defense,
             f.position,
             CAST(AVG(
-                ISNULL(f.passing_yards, 0) * 0.04
-              + ISNULL(f.passing_tds, 0) * 4.0
-              + ISNULL(f.interceptions, 0) * -2.0
-              + ISNULL(f.rushing_yards, 0) * 0.1
-              + ISNULL(f.rushing_tds, 0) * 6.0
-              + ISNULL(f.receptions, 0) * :ppr
-              + ISNULL(f.receiving_yards, 0) * 0.1
-              + ISNULL(f.receiving_tds, 0) * 6.0
-              + ISNULL(f.total_fumbles_lost, 0) * -2.0
+                COALESCE(f.passing_yards, 0) * 0.04
+              + COALESCE(f.passing_tds, 0) * 4.0
+              + COALESCE(f.interceptions, 0) * -2.0
+              + COALESCE(f.rushing_yards, 0) * 0.1
+              + COALESCE(f.rushing_tds, 0) * 6.0
+              + COALESCE(f.receptions, 0) * :ppr
+              + COALESCE(f.receiving_yards, 0) * 0.1
+              + COALESCE(f.receiving_tds, 0) * 6.0
+              + COALESCE(f.total_fumbles_lost, 0) * -2.0
             ) AS DECIMAL(10,2))                         AS avg_pts_allowed
         FROM mart.fact_player_week f
         WHERE f.season = :season
