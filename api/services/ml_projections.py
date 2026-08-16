@@ -61,6 +61,28 @@ def _get_engine():
         return get_engine()
 
 
+def _is_postgres(engine=None) -> bool:
+    """True when the resolved connection is Postgres rather than SQL Server."""
+    try:
+        # API context — reuse the flag the rest of the API already computes.
+        from database import IS_POSTGRES
+        return IS_POSTGRES
+    except ImportError:
+        # Training context — ask the engine directly.
+        engine = engine or _get_engine()
+        return engine.url.get_backend_name() == "postgresql"
+
+
+def _adapt_schema(query: str, engine=None) -> str:
+    """Drop the `mart.` prefix when running on Postgres.
+
+    sync_to_neon.py lands the mart tables in Neon's default public schema with
+    no prefix, so `mart.fact_player_week` only resolves on SQL Server. This
+    mirrors what execute_query() in database.py does for the rest of the API.
+    """
+    return query.replace("mart.", "") if _is_postgres(engine) else query
+
+
 def _read_sql(query: str, params: dict | None = None) -> pd.DataFrame:
     """Run a query and return a DataFrame, normalising column names to lower.
 
@@ -70,7 +92,7 @@ def _read_sql(query: str, params: dict | None = None) -> pd.DataFrame:
     from sqlalchemy import text
 
     engine = _get_engine()
-    stmt = text(query)
+    stmt = text(_adapt_schema(query, engine))
     if params:
         df = pd.read_sql(stmt, engine, params=params)
     else:
