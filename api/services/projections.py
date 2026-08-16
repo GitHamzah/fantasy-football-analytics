@@ -47,24 +47,98 @@ def get_player_projections(
     scoring; otherwise falls back to the weighted-average engine. The response
     shape is identical either way, with `method` recording which was used.
     """
-    if scoring == _ML_SCORING:
-        try:
-            from services.ml_projections import model_exists, predict_next_season
+    # ------------------------------------------------------------------
+    # TEMPORARY DEBUG — diagnosing why the ML path falls back in
+    # production. Remove this whole block (and the [projections] prints
+    # below) once the Render logs have told us what we need.
+    # ------------------------------------------------------------------
+    import os
+    import traceback
 
-            if model_exists():
-                ml_rows = predict_next_season(
-                    target_season=target_season,
-                    limit=limit,
-                    min_games=min_games,
-                )
-                if ml_rows:
-                    return _finalise(_to_projection_shape(ml_rows), limit)
-        except Exception as e:
-            import traceback
-            print(f"ML projection failed, falling back to weighted average: {e}")
-            traceback.print_exc()
+    print("=" * 62)
+    print(f"[projections] request season={target_season} scoring={scoring} "
+          f"min_games={min_games} limit={limit}")
+    print(f"Working directory: {os.getcwd()}")
+    try:
+        print(f"Files in current dir: {os.listdir('.')}")
+    except Exception as e:
+        print(f"Files in current dir: could not list ({type(e).__name__}: {e})")
+    print(f"Files in models/ dir: "
+          f"{os.listdir('models') if os.path.exists('models') else 'models/ not found'}")
+    # ------------------------------------------------------------------
 
-    return _weighted_average_projections(target_season, scoring, min_games, limit)
+    def _fallback(reason: str) -> list[dict]:
+        print(f"[projections] Falling back to weighted averages because: {reason}")
+        return _weighted_average_projections(target_season, scoring, min_games, limit)
+
+    if scoring != _ML_SCORING:
+        return _fallback(
+            f"scoring={scoring!r} but the model is trained on {_ML_SCORING!r} only"
+        )
+
+    # 1. Import — catches a missing scikit-learn/joblib/pandas on the host
+    try:
+        from services.ml_projections import (
+            MODEL_PATH,
+            FEATURES_PATH,
+            model_exists,
+            load_model,
+            predict_next_season,
+        )
+    except Exception as e:
+        print(f"[projections] Could not import ml_projections: {type(e).__name__}: {e}")
+        traceback.print_exc()
+        return _fallback(f"ml_projections import failed ({type(e).__name__}: {e})")
+
+    # 2. Artifact locations and whether they are actually there
+    print(f"[projections] model path    : {os.path.abspath(MODEL_PATH)}")
+    print(f"[projections] model exists  : {os.path.exists(MODEL_PATH)}")
+    print(f"[projections] features path : {os.path.abspath(FEATURES_PATH)}")
+    print(f"[projections] features exist: {os.path.exists(FEATURES_PATH)}")
+
+    if not model_exists():
+        missing = [
+            p for p in (MODEL_PATH, FEATURES_PATH) if not os.path.exists(p)
+        ]
+        return _fallback(
+            "model artifact not found — missing: "
+            + ", ".join(os.path.abspath(p) for p in missing)
+        )
+
+    # 3. Deserialize — catches a scikit-learn version mismatch between the
+    #    machine that trained the model and the one serving it
+    try:
+        model, feature_names = load_model()
+        print(f"[projections] ML model loaded successfully "
+              f"({type(model).__name__}, {len(feature_names)} features)")
+    except Exception as e:
+        print(f"[projections] Failed to load model from "
+              f"{os.path.abspath(MODEL_PATH)}: {type(e).__name__}: {e}")
+        traceback.print_exc()
+        return _fallback(f"model failed to deserialize ({type(e).__name__}: {e})")
+
+    # 4. Predict — catches query failures against the serving database
+    try:
+        ml_rows = predict_next_season(
+            target_season=target_season,
+            limit=limit,
+            min_games=min_games,
+        )
+    except Exception as e:
+        print(f"[projections] ML prediction raised {type(e).__name__}: {e}")
+        traceback.print_exc()
+        return _fallback(f"prediction failed ({type(e).__name__}: {e})")
+
+    # 5. Empty result — usually means the source season has no rows in the
+    #    serving database (e.g. Neon has not been synced with 2025 yet)
+    if not ml_rows:
+        return _fallback(
+            f"prediction returned 0 rows — no qualifying players for source "
+            f"season {target_season - 1} with >= {min_games} games"
+        )
+
+    print(f"[projections] ML path returning {len(ml_rows)} projections")
+    return _finalise(_to_projection_shape(ml_rows), limit)
 
 
 def _to_projection_shape(ml_rows: list[dict]) -> list[dict]:
