@@ -161,6 +161,29 @@ def get_schedule_strength(season: int = 2026, position: str = None, scoring: str
 def get_team_schedule(team: str, season: int = 2026, position: str = "RB", scoring: str = "ppr") -> dict | None:
     return _get(f"/projections/schedule/{team}", {"season": season, "position": position, "scoring": scoring})
 
+# --- Advanced (team defense + PFR) ---
+@st.cache_data(ttl=300)
+def get_team_defense(season: int) -> list:
+    """Team defensive quality metrics for DST streaming decisions."""
+    return _get("/advanced/team-defense", {"season": season}) or []
+
+
+@st.cache_data(ttl=300)
+def get_player_advanced(player_id: str, season: int = None) -> list:
+    """PFR advanced metrics for a player, by season. Empty if not covered."""
+    params = {"season": season} if season else None
+    return _get(f"/advanced/pfr/player/{player_id}", params) or []
+
+
+@st.cache_data(ttl=300)
+def get_defense_by_unit(season: int, unit: str = None) -> list:
+    """PFR defensive metrics by team and unit (SECONDARY / FRONT7)."""
+    params = {"season": season}
+    if unit:
+        params["unit"] = unit
+    return _get("/advanced/pfr/defense-vs-position", params) or []
+
+
 # --- AI ---
 def ask_ai(question: str) -> dict | None:
     return _post("/ai/ask", {"question": question})
