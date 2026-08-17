@@ -1,30 +1,45 @@
 """Draft War Room — who should I draft?"""
 
-import pandas as pd
-import plotly.express as px
-import plotly.graph_objects as go
 import streamlit as st
 
-from utils.api import (
-    get_projections,
-    get_vor,
-    get_team_schedule,
-    get_trajectory,
-    get_player_advanced,
-    player_dropdown,
-)
-from utils.components import (
-    POSITION_COLORS,
-    api_guard,
-    inject_custom_css,
-    matchup_rating_label,
-    metric_row,
-    player_card_html,
-    season_axis,
-    section_header,
-    sidebar,
-    style_fig,
-)
+# TEMPORARY DIAGNOSTIC — surfaces the real import error on Streamlit Cloud
+# instead of a blank crash. Remove once the deploy is confirmed healthy.
+# Third-party imports are inside the try as well, so a missing plotly/pandas
+# on the host is caught here rather than failing above this block.
+try:
+    import pandas as pd
+    import plotly.express as px
+    import plotly.graph_objects as go
+
+    from utils.api import (
+        get_projections,
+        get_vor,
+        get_team_schedule,
+        get_trajectory,
+        get_player_advanced,
+        player_dropdown,
+    )
+    from utils.components import (
+        POSITION_COLORS,
+        api_guard,
+        inject_custom_css,
+        matchup_rating_label,
+        metric_row,
+        player_card_html,
+        season_axis,
+        section_header,
+        sidebar,
+        style_fig,
+    )
+except Exception as e:
+    import sys
+    import traceback
+
+    st.error(f"Import failed: {type(e).__name__}: {e}")
+    st.code(traceback.format_exc(), language="text")
+    st.caption(f"Python {sys.version}")
+    st.caption(f"sys.path: {sys.path}")
+    st.stop()
 
 st.set_page_config(page_title="Draft War Room", page_icon="🏆", layout="wide")
 inject_custom_css()
