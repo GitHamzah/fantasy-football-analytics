@@ -41,11 +41,16 @@ def execute_query(query: str, params: dict = None) -> list[dict]:
     Handles SQL dialect differences between SQL Server and Postgres:
     - ISNULL → COALESCE
     - TOP N → LIMIT N
+    - STDEV → STDDEV
     """
     if IS_POSTGRES:
         # Convert SQL Server syntax to Postgres
         query = query.replace("ISNULL(", "COALESCE(")
         query = query.replace("CONCAT(", "CONCAT(")
+        # SQL Server spells the sample standard deviation STDEV; Postgres wants
+        # STDDEV. Safe to run repeatedly: "STDEV(" is not a substring of
+        # "STDDEV(", so an already-converted query is left alone.
+        query = query.replace("STDEV(", "STDDEV(")
 
         # Convert TOP N to LIMIT N
         import re
