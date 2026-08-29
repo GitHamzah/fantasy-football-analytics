@@ -70,6 +70,25 @@ def get_team_formations(
         ORDER BY SUM(f.play_count) DESC
     """, {"season": season, "team": team})
 
+    # Formation x grouping detail — the mart's native grain. Backs the
+    # per-formation personnel pills and the breakdown table in the UI, which
+    # the two team-level aggregations above cannot: personnel there is
+    # aggregated across all formations.
+    breakdown = execute_query("""
+        SELECT
+            f.formation,
+            f.personnel_grouping,
+            SUM(f.play_count) AS play_count,
+            SUM(CASE WHEN f.avg_defenders_in_box IS NOT NULL
+                     THEN f.avg_defenders_in_box * f.play_count END)
+              / NULLIF(SUM(CASE WHEN f.avg_defenders_in_box IS NOT NULL
+                                THEN f.play_count END), 0) AS avg_box
+        FROM mart.formation f
+        WHERE f.season = :season AND f.team = :team
+        GROUP BY f.formation, f.personnel_grouping
+        ORDER BY SUM(f.play_count) DESC
+    """, {"season": season, "team": team})
+
     return {
         "team": team,
         "season": season,
@@ -94,6 +113,18 @@ def get_team_formations(
                 "pct": _pct(r["play_count"], total_plays),
             }
             for r in personnel
+        ],
+        "breakdown": [
+            {
+                "formation": r["formation"],
+                "grouping": r["personnel_grouping"],
+                "label": _personnel_label(r["personnel_grouping"])
+                         if r["personnel_grouping"] else None,
+                "play_count": r["play_count"],
+                "pct": _pct(r["play_count"], total_plays),
+                "avg_box": round(r["avg_box"], 1) if r["avg_box"] is not None else None,
+            }
+            for r in breakdown
         ],
     }
 
