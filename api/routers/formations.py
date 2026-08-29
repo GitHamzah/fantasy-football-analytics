@@ -28,8 +28,10 @@ def _personnel_label(grouping: str) -> str:
     return f"{rb} RB, {te} TE, {wr} WR"
 
 
-def _pct(part: float, whole: float) -> float:
-    return round(100.0 * part / whole, 1) if whole else 0.0
+def _pct(part, whole) -> float:
+    # psycopg2 returns decimal.Decimal for SUM/AVG results; Decimal cannot mix
+    # with float arithmetic, so cast both operands before dividing.
+    return round(100.0 * float(part) / float(whole), 1) if whole else 0.0
 
 
 @router.get("/formations")
@@ -57,7 +59,7 @@ def get_team_formations(
     if not formations:
         raise HTTPException(404, f"No formation data for {team} in {season}")
 
-    total_plays = sum(r["play_count"] for r in formations)
+    total_plays = sum(int(r["play_count"]) for r in formations)
 
     personnel = execute_query("""
         SELECT
@@ -96,9 +98,9 @@ def get_team_formations(
         "formations": [
             {
                 "formation": r["formation"],
-                "play_count": r["play_count"],
+                "play_count": int(r["play_count"]),
                 "pct": _pct(r["play_count"], total_plays),
-                "avg_box": round(r["avg_box"], 1) if r["avg_box"] is not None else None,
+                "avg_box": round(float(r["avg_box"]), 1) if r["avg_box"] is not None else None,
             }
             for r in formations
         ],
@@ -109,7 +111,7 @@ def get_team_formations(
             {
                 "grouping": r["personnel_grouping"],
                 "label": _personnel_label(r["personnel_grouping"]),
-                "play_count": r["play_count"],
+                "play_count": int(r["play_count"]),
                 "pct": _pct(r["play_count"], total_plays),
             }
             for r in personnel
@@ -120,9 +122,9 @@ def get_team_formations(
                 "grouping": r["personnel_grouping"],
                 "label": _personnel_label(r["personnel_grouping"])
                          if r["personnel_grouping"] else None,
-                "play_count": r["play_count"],
+                "play_count": int(r["play_count"]),
                 "pct": _pct(r["play_count"], total_plays),
-                "avg_box": round(r["avg_box"], 1) if r["avg_box"] is not None else None,
+                "avg_box": round(float(r["avg_box"]), 1) if r["avg_box"] is not None else None,
             }
             for r in breakdown
         ],
@@ -165,13 +167,13 @@ def get_league_formations(
     teams: dict[str, dict] = {}
     for r in rows:
         t = teams.setdefault(r["team"], {"total": 0, "formations": {}})
-        t["total"] += r["play_count"]
-        t["formations"][r["formation"]] = r["play_count"]
+        t["total"] += int(r["play_count"])
+        t["formations"][r["formation"]] = int(r["play_count"])
 
     best: dict[str, dict] = {}
     for r in top_personnel:
         cur = best.get(r["team"])
-        if cur is None or r["play_count"] > cur["play_count"]:
+        if cur is None or int(r["play_count"]) > int(cur["play_count"]):
             best[r["team"]] = r
 
     result = []
@@ -239,7 +241,7 @@ def get_formation_roster(
     for pos, limit in _ROSTER_SLOTS.items():
         ranked = sorted(
             by_pos.get(pos, []),
-            key=lambda r: (r["games"], r["touches"]),
+            key=lambda r: (int(r["games"]), float(r["touches"] or 0)),
             reverse=True,
         )
         players[pos] = [
