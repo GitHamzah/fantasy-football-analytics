@@ -252,3 +252,122 @@ def get_formation_roster(
     players["OL"] = []
 
     return {"team": team, "season": season, "players": players}
+
+
+@router.get("/def-formations")
+def get_team_def_formations(
+    season: int = Query(..., description="Season year"),
+    team: str = Query(..., description="Team abbreviation, e.g. KC"),
+):
+    """Defensive package and coverage-shell tendencies for one team-season.
+
+    avg_dl/avg_lb/avg_db are the fronts each package is actually run from
+    (a "Nickel" can be 4-2-5, 3-3-5 or 2-4-5) — the field visual uses them.
+    All numerics are cast to int/float: psycopg2 returns Decimal for
+    SUM/AVG, which cannot mix with float arithmetic.
+    """
+    team = team.upper()
+
+    packages = execute_query("""
+        SELECT
+            f.def_personnel_grouping,
+            SUM(f.play_count) AS play_count,
+            SUM(CASE WHEN f.avg_box IS NOT NULL THEN f.avg_box * f.play_count END)
+              / NULLIF(SUM(CASE WHEN f.avg_box IS NOT NULL THEN f.play_count END), 0) AS avg_box,
+            SUM(f.avg_dl * f.play_count) / NULLIF(SUM(f.play_count), 0) AS avg_dl,
+            SUM(f.avg_lb * f.play_count) / NULLIF(SUM(f.play_count), 0) AS avg_lb,
+            SUM(f.avg_db * f.play_count) / NULLIF(SUM(f.play_count), 0) AS avg_db
+        FROM mart.def_formation f
+        WHERE f.season = :season AND f.team = :team
+        GROUP BY f.def_personnel_grouping
+        ORDER BY SUM(f.play_count) DESC
+    """, {"season": season, "team": team})
+
+    if not packages:
+        raise HTTPException(404, f"No defensive formation data for {team} in {season}")
+
+    total_plays = sum(int(r["play_count"]) for r in packages)
+
+    shells = execute_query("""
+        SELECT
+            f.coverage_shell,
+            SUM(f.play_count) AS play_count
+        FROM mart.def_formation f
+        WHERE f.season = :season AND f.team = :team
+          AND f.coverage_shell IS NOT NULL
+        GROUP BY f.coverage_shell
+        ORDER BY SUM(f.play_count) DESC
+    """, {"season": season, "team": team})
+    shell_total = sum(int(r["play_count"]) for r in shells)
+
+    def _f(v, digits=1):
+        return round(float(v), digits) if v is not None else None
+
+    return {
+        "team": team,
+        "season": season,
+        "total_plays": total_plays,
+        "personnel": [
+            {
+                "grouping": r["def_personnel_grouping"],
+                "play_count": int(r["play_count"]),
+                "pct": _pct(r["play_count"], total_plays),
+                "avg_box": _f(r["avg_box"]),
+                "avg_dl": _f(r["avg_dl"]),
+                "avg_lb": _f(r["avg_lb"]),
+                "avg_db": _f(r["avg_db"]),
+            }
+            for r in packages
+        ],
+        # Shell percentages use the shell subtotal: box counts are missing on
+        # a minority of plays and those cannot be assigned a shell.
+        "coverage_shells": [
+            {
+                "shell": r["coverage_shell"],
+                "play_count": int(r["play_count"]),
+                "pct": _pct(r["play_count"], shell_total),
+            }
+            for r in shells
+        ],
+    }
+
+
+@router.get("/def-formations/league")
+def get_league_def_formations(
+    season: int = Query(..., description="Season year"),
+):
+    """Every defense's package split for a season, sorted by nickel rate."""
+    rows = execute_query("""
+        SELECT
+            f.team,
+            f.def_personnel_grouping,
+            SUM(f.play_count) AS play_count
+        FROM mart.def_formation f
+        WHERE f.season = :season
+        GROUP BY f.team, f.def_personnel_grouping
+    """, {"season": season})
+
+    if not rows:
+        raise HTTPException(404, f"No defensive formation data for season {season}")
+
+    teams: dict[str, dict] = {}
+    for r in rows:
+        t = teams.setdefault(r["team"], {"total": 0, "packages": {}})
+        n = int(r["play_count"])
+        t["total"] += n
+        t["packages"][r["def_personnel_grouping"]] = n
+
+    result = []
+    for team, t in teams.items():
+        base = t["packages"].get("4-3 Base", 0) + t["packages"].get("3-4 Base", 0)
+        result.append({
+            "team": team,
+            "total_plays": t["total"],
+            "nickel_pct": _pct(t["packages"].get("Nickel", 0), t["total"]),
+            "dime_pct": _pct(t["packages"].get("Dime", 0), t["total"]),
+            "base_pct": _pct(base, t["total"]),
+            "top_package": max(t["packages"], key=t["packages"].get) if t["packages"] else None,
+        })
+
+    result.sort(key=lambda r: r["nickel_pct"], reverse=True)
+    return {"season": season, "teams": result}

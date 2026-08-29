@@ -53,6 +53,7 @@ MART_TABLES = [
     ("mart.team_defense", "team_defense"),
     ("mart.pfr_advstats", "pfr_advstats"),
     ("mart.formation", "formation"),
+    ("mart.def_formation", "def_formation"),
 ]
 
 

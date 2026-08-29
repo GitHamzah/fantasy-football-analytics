@@ -84,3 +84,23 @@ models:
       - name: play_count
         tests:
           - not_null
+
+  - name: fact_def_formation
+    description: >
+      Defensive package tendencies at defensive-team-season-package-shell
+      grain. The defensive team is derived via dim_game (the side not in
+      possession). Named packages (Nickel, Dime, 4-3 Base, ...) with avg
+      DL/LB/DB counts showing the actual front each package runs from.
+    columns:
+      - name: team
+        tests:
+          - not_null
+      - name: season
+        tests:
+          - not_null
+      - name: def_personnel_grouping
+        tests:
+          - not_null
+      - name: play_count
+        tests:
+          - not_null

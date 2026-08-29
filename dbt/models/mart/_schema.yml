@@ -111,3 +111,15 @@ models:
       - name: season
         tests:
           - not_null
+
+  - name: mart_def_formation
+    description: >
+      Defensive package and coverage-shell tendencies for the API layer.
+      Passthrough of fact_def_formation.
+    columns:
+      - name: team
+        tests:
+          - not_null
+      - name: season
+        tests:
+          - not_null
