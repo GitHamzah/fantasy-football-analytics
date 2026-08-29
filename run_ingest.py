@@ -44,7 +44,7 @@ def main():
     start = time.time()
 
     # 1. Players (full universe, not season-specific)
-    print("[1/5] Players")
+    print("[1/6] Players")
     try:
         ingest_players()
     except Exception as e:
@@ -52,7 +52,7 @@ def main():
     print()
 
     # 2. Schedules
-    print("[2/5] Schedules")
+    print("[2/6] Schedules")
     try:
         ingest_schedules(seasons)
     except Exception as e:
@@ -60,7 +60,7 @@ def main():
     print()
 
     # 3. Player stats (weekly) — may not exist for future seasons
-    print("[3/5] Player Stats")
+    print("[3/6] Player Stats")
     try:
         ingest_player_stats(seasons)
     except Exception as e:
@@ -73,7 +73,7 @@ def main():
     print()
 
     # 4. Weekly rosters
-    print("[4/5] Rosters Weekly")
+    print("[4/6] Rosters Weekly")
     try:
         ingest_rosters_weekly(seasons)
     except Exception as e:
@@ -86,12 +86,21 @@ def main():
     print()
 
     # 5. PFR Advanced Stats
-    print("[5/5] PFR Advanced Stats")
+    print("[5/6] PFR Advanced Stats")
     try:
         from src.ingest.pfr_advstats import ingest_pfr_advstats
         ingest_pfr_advstats(seasons)
     except Exception as e:
         print(f"  ⚠ PFR Advanced Stats failed: {e}")
+    print()
+
+    # 6. Participation (formations & personnel)
+    print("[6/6] Participation (formations & personnel)")
+    try:
+        from src.ingest.participation import ingest_participation
+        ingest_participation(seasons)
+    except Exception as e:
+        print(f"  ⚠ Participation failed: {e}")
     print()
 
     elapsed = time.time() - start

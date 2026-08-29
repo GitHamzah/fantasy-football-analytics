@@ -99,3 +99,15 @@ models:
       - name: season
         tests:
           - not_null
+
+  - name: mart_formation
+    description: >
+      Formation and personnel tendencies for the API layer. One row per
+      team-season-formation-personnel grouping. Passthrough of fact_formation.
+    columns:
+      - name: team
+        tests:
+          - not_null
+      - name: season
+        tests:
+          - not_null

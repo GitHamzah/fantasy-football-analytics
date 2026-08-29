@@ -82,3 +82,18 @@ sources:
               - not_null:
                   config:
                     severity: warn
+
+      - name: participation
+        description: >
+          Play-level participation with formations and personnel — one row per
+          play. Feed schema breaks between 2022 and 2023: formation vocabulary
+          collapses from 7 values to 3, and offense_personnel switches from a
+          skill-only list to a full 11-man list with ~14% defensive
+          contamination. stg_participation handles both eras.
+        columns:
+          - name: nflverse_game_id
+            description: "Game identifier; joins pbp on nflverse_game_id + play_id."
+            tests:
+              - not_null:
+                  config:
+                    severity: warn

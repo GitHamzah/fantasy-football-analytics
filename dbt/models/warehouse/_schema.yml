@@ -64,3 +64,23 @@ models:
     tests:
       - unique:
           column_name: "(pfr_player_id + '-' + CAST(season AS VARCHAR) + '-' + CAST(week AS VARCHAR))"
+
+  - name: fact_formation
+    description: >
+      Team formation and personnel tendencies at team-season-formation-
+      personnel_grouping grain. personnel_grouping is NULL where 2023+
+      offense_personnel failed validation (no single QB, or OL outside 4-6).
+      Formation vocabulary differs by era: 7 values through 2022, 3 from 2023.
+    columns:
+      - name: team
+        tests:
+          - not_null
+      - name: season
+        tests:
+          - not_null
+      - name: formation
+        tests:
+          - not_null
+      - name: play_count
+        tests:
+          - not_null

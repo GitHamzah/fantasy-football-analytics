@@ -52,6 +52,7 @@ MART_TABLES = [
     ("mart.fact_player_week", "fact_player_week"),
     ("mart.team_defense", "team_defense"),
     ("mart.pfr_advstats", "pfr_advstats"),
+    ("mart.formation", "formation"),
 ]
 
 
