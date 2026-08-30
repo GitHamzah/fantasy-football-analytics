@@ -54,6 +54,10 @@ MART_TABLES = [
     ("mart.pfr_advstats", "pfr_advstats"),
     ("mart.formation", "formation"),
     ("mart.def_formation", "def_formation"),
+    # fact_play_matchup itself stays local: ~170K rows is too heavy for the
+    # sync, and the API only needs these aggregations.
+    ("mart.player_vs_defense", "player_vs_defense"),
+    ("mart.team_matchup", "team_matchup"),
 ]
 
 

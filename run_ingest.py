@@ -44,7 +44,7 @@ def main():
     start = time.time()
 
     # 1. Players (full universe, not season-specific)
-    print("[1/6] Players")
+    print("[1/7] Players")
     try:
         ingest_players()
     except Exception as e:
@@ -52,7 +52,7 @@ def main():
     print()
 
     # 2. Schedules
-    print("[2/6] Schedules")
+    print("[2/7] Schedules")
     try:
         ingest_schedules(seasons)
     except Exception as e:
@@ -60,7 +60,7 @@ def main():
     print()
 
     # 3. Player stats (weekly) — may not exist for future seasons
-    print("[3/6] Player Stats")
+    print("[3/7] Player Stats")
     try:
         ingest_player_stats(seasons)
     except Exception as e:
@@ -73,7 +73,7 @@ def main():
     print()
 
     # 4. Weekly rosters
-    print("[4/6] Rosters Weekly")
+    print("[4/7] Rosters Weekly")
     try:
         ingest_rosters_weekly(seasons)
     except Exception as e:
@@ -86,7 +86,7 @@ def main():
     print()
 
     # 5. PFR Advanced Stats
-    print("[5/6] PFR Advanced Stats")
+    print("[5/7] PFR Advanced Stats")
     try:
         from src.ingest.pfr_advstats import ingest_pfr_advstats
         ingest_pfr_advstats(seasons)
@@ -95,12 +95,21 @@ def main():
     print()
 
     # 6. Participation (formations & personnel)
-    print("[6/6] Participation (formations & personnel)")
+    print("[6/7] Participation (formations & personnel)")
     try:
         from src.ingest.participation import ingest_participation
         ingest_participation(seasons)
     except Exception as e:
         print(f"  ⚠ Participation failed: {e}")
+    print()
+
+    # 7. Play-by-Play (pass/run snaps for matchup analysis)
+    print("[7/7] Play-by-Play")
+    try:
+        from src.ingest.pbp import ingest_pbp
+        ingest_pbp(seasons)
+    except Exception as e:
+        print(f"  ⚠ Play-by-Play failed: {e}")
     print()
 
     elapsed = time.time() - start

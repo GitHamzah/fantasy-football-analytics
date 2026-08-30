@@ -104,3 +104,19 @@ models:
       - name: play_count
         tests:
           - not_null
+
+  - name: fact_play_matchup
+    description: >
+      One row per pass/run snap: pbp outcomes joined LEFT to participation
+      context (formation, personnel, package, shell) on nflverse_game_id +
+      play_id. NULL context means no participation row or unparsed personnel.
+    columns:
+      - name: nflverse_game_id
+        tests:
+          - not_null
+      - name: play_id
+        tests:
+          - not_null
+    tests:
+      - unique:
+          column_name: "(nflverse_game_id + '-' + CAST(play_id AS VARCHAR))"

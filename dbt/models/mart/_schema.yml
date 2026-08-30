@@ -123,3 +123,19 @@ models:
       - name: season
         tests:
           - not_null
+
+  - name: mart_player_vs_defense
+    description: >
+      Player performance vs defense-package-shell, three roles stacked (WR/TE, RB, QB). attempts = targets/carries/dropbacks by role.
+    columns:
+      - name: season
+        tests:
+          - not_null
+
+  - name: mart_team_matchup
+    description: >
+      Offense vs defense by package and shell, one row per offense-defense-season-package-shell.
+    columns:
+      - name: season
+        tests:
+          - not_null

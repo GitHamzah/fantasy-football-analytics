@@ -97,3 +97,16 @@ sources:
               - not_null:
                   config:
                     severity: warn
+
+      - name: pbp
+        description: >
+          Play-by-play pass/run snaps with outcomes (yards, EPA, players
+          involved). Filtered to play_type pass/run at ingest. game_id from
+          the feed is landed as nflverse_game_id; with play_id it joins
+          participation exactly.
+        columns:
+          - name: nflverse_game_id
+            tests:
+              - not_null:
+                  config:
+                    severity: warn
