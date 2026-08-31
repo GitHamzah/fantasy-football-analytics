@@ -249,9 +249,88 @@ def get_formation_roster(
             for r in ranked[:limit]
         ]
 
-    players["OL"] = []
+    players["OL"] = _offensive_line(team, season)
 
     return {"team": team, "season": season, "players": players}
+
+
+# fact_player_week position codes by line spot. 'T' and 'OG' are in the lists
+# for safety but this data spells them 'OT' and 'G'; bare 'OL' fills gaps.
+_OL_CENTER = ("C",)
+_OL_GUARD = ("G", "OG")
+_OL_TACKLE = ("T", "OT")
+
+
+def _offensive_line(team: str, season: int) -> list[dict]:
+    """Starting five for the formation visual: 1 C, 2 G, 2 T by games played.
+
+    OL players do appear in fact_player_week, so that ranks the starters; the
+    dim_player fallback exists for teams/seasons with no OL rows, but carries
+    no usage signal (current_team only) so it is last resort.
+    """
+    rows = execute_query("""
+        SELECT
+            f.gsis_id                                   AS player_id,
+            COALESCE(d.display_name, f.display_name)    AS name,
+            f.position,
+            COUNT(DISTINCT f.week)                      AS games
+        FROM mart.fact_player_week f
+        LEFT JOIN mart.dim_player d ON d.gsis_id = f.gsis_id
+        WHERE f.season = :season
+          AND f.recent_team = :team
+          AND f.season_type = 'REG'
+          AND f.position IN ('C', 'G', 'T', 'OL', 'OT', 'OG')
+        GROUP BY f.gsis_id, COALESCE(d.display_name, f.display_name), f.position
+        ORDER BY COUNT(DISTINCT f.week) DESC
+    """, {"season": season, "team": team})
+
+    if not rows:
+        rows = execute_query("""
+            SELECT
+                d.gsis_id       AS player_id,
+                d.display_name  AS name,
+                d.position,
+                0               AS games
+            FROM mart.dim_player d
+            WHERE d.current_team = :team
+              AND d.position IN ('C', 'G', 'T', 'OL', 'OT', 'OG')
+              AND d.status = 'ACT'
+        """, {"team": team})
+
+    ranked = sorted(rows, key=lambda r: int(r["games"] or 0), reverse=True)
+
+    def take(codes, n, used):
+        out = []
+        for r in ranked:
+            if len(out) == n:
+                break
+            if r["position"] in codes and r["player_id"] not in used:
+                used.add(r["player_id"])
+                out.append(r)
+        return out
+
+    used: set = set()
+    line = take(_OL_CENTER, 1, used) + take(_OL_GUARD, 2, used) + take(_OL_TACKLE, 2, used)
+    # Fill any unfilled spot with the best remaining lineman regardless of code.
+    for r in ranked:
+        if len(line) == 5:
+            break
+        if r["player_id"] not in used:
+            used.add(r["player_id"])
+            line.append(r)
+
+    # Normalize position codes for the frontend: C / G / T (bare OL passes as-is).
+    def norm(p):
+        if p in _OL_GUARD:
+            return "G"
+        if p in _OL_TACKLE:
+            return "T"
+        return p
+
+    return [
+        {"name": r["name"], "player_id": r["player_id"], "position": norm(r["position"])}
+        for r in line[:5]
+    ]
 
 
 @router.get("/def-formations")
@@ -371,3 +450,79 @@ def get_league_def_formations(
 
     result.sort(key=lambda r: r["nickel_pct"], reverse=True)
     return {"season": season, "teams": result}
+
+
+# Defensive position groups for the formation visual, with slots per group.
+# SS does not appear in this data's fact_player_week — safeties are 'SAF'.
+_DEF_GROUPS: list[tuple[str, tuple, int]] = [
+    ("DL", ("DE", "DT", "NT", "DL"), 4),
+    ("LB", ("LB", "MLB", "ILB", "OLB", "SLB", "WLB"), 4),
+    ("CB", ("CB",), 3),
+    ("S", ("SS", "FS", "SAF", "S", "DB"), 2),
+]
+
+
+@router.get("/def-formations/roster")
+def get_def_formation_roster(
+    team: str = Query(..., description="Team abbreviation, e.g. KC"),
+    season: int = Query(..., description="Season year"),
+):
+    """The defenders who populate the defensive formation visual.
+
+    Ranked by regular-season games with total tackles as the tiebreak, so
+    starters outrank rotational players. Defensive positions ARE present in
+    fact_player_week (verified: CB/DE/DT/SAF/LB all populated); dim_player is
+    the no-usage fallback.
+    """
+    team = team.upper()
+    all_positions = tuple(p for _, codes, _ in _DEF_GROUPS for p in codes)
+
+    rows = execute_query(f"""
+        SELECT
+            f.gsis_id                                   AS player_id,
+            COALESCE(d.display_name, f.display_name)    AS name,
+            f.position,
+            COUNT(DISTINCT f.week)                      AS games,
+            SUM(COALESCE(f.def_total_tackles, 0)
+              + COALESCE(f.def_sacks, 0))               AS involvement
+        FROM mart.fact_player_week f
+        LEFT JOIN mart.dim_player d ON d.gsis_id = f.gsis_id
+        WHERE f.season = :season
+          AND f.recent_team = :team
+          AND f.season_type = 'REG'
+          AND f.position IN {all_positions!r}
+        GROUP BY f.gsis_id, COALESCE(d.display_name, f.display_name), f.position
+    """.replace('"', "'"), {"season": season, "team": team})
+
+    if not rows:
+        rows = execute_query(f"""
+            SELECT
+                d.gsis_id       AS player_id,
+                d.display_name  AS name,
+                d.position,
+                0               AS games,
+                0               AS involvement
+            FROM mart.dim_player d
+            WHERE d.current_team = :team
+              AND d.position IN {all_positions!r}
+              AND d.status = 'ACT'
+        """.replace('"', "'"), {"team": team})
+
+    if not rows:
+        raise HTTPException(404, f"No defensive roster data for {team} in {season}")
+
+    ranked = sorted(
+        rows,
+        key=lambda r: (int(r["games"] or 0), float(r["involvement"] or 0)),
+        reverse=True,
+    )
+
+    players: dict[str, list] = {}
+    for group, codes, limit in _DEF_GROUPS:
+        players[group] = [
+            {"name": r["name"], "player_id": r["player_id"], "position": r["position"]}
+            for r in ranked
+            if r["position"] in codes
+        ][:limit]
+
+    return {"team": team, "season": season, "players": players}
