@@ -58,6 +58,11 @@ MART_TABLES = [
     # sync, and the API only needs these aggregations.
     ("mart.player_vs_defense", "player_vs_defense"),
     ("mart.team_matchup", "team_matchup"),
+    # Sleeper league marts — flat tables so the API can serve league features
+    # from Neon; the sleeper schema itself never leaves SQL Server.
+    ("mart.my_roster", "my_roster"),
+    ("mart.league_standings", "league_standings"),
+    ("mart.league_matchup", "league_matchup"),
 ]
 
 

@@ -139,3 +139,27 @@ models:
       - name: season
         tests:
           - not_null
+
+  - name: mart_my_roster
+    description: >
+      Hamzah's 2026 Sleeper rosters joined to 2025 production and coverage-shell matchup splits.
+    columns:
+      - name: league_id
+        tests:
+          - not_null
+
+  - name: mart_league_standings
+    description: >
+      2026 Sleeper league standings, one row per manager per league, with league settings for API summaries.
+    columns:
+      - name: league_id
+        tests:
+          - not_null
+
+  - name: mart_league_matchup
+    description: >
+      Weekly Sleeper head-to-head scores with manager names, all seasons.
+    columns:
+      - name: league_id
+        tests:
+          - not_null

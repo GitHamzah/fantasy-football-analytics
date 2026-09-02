@@ -13,6 +13,7 @@ elements.
 Run from the project root:  python -m src.ingest.sleeper
 """
 
+import ast
 import time
 
 import nflreadpy as nfl
@@ -235,6 +236,25 @@ def ingest_sleeper():
         _load_to_sleeper(pd.DataFrame(all_users), "user", engine)
     if all_rosters:
         _load_to_sleeper(pd.DataFrame(all_rosters), "roster", engine)
+
+        # Normalize roster players into one row per (league, roster, player) so
+        # dbt can join them without parsing stringified lists in SQL.
+        roster_players = []
+        for r in all_rosters:
+            players = ast.literal_eval(r["players"]) if r["players"] else []
+            starters = {str(x) for x in ast.literal_eval(r["starters"]) if x} if r["starters"] else set()
+            for pid in players:
+                if pid:
+                    roster_players.append({
+                        "league_id": r["league_id"],
+                        "roster_id": r["roster_id"],
+                        "owner_id": r["owner_id"],
+                        "sleeper_id": str(pid),
+                        "is_starter": str(pid) in starters,
+                        "season": r["season"],
+                    })
+        if roster_players:
+            _load_to_sleeper(pd.DataFrame(roster_players), "roster_player", engine)
     if all_matchups:
         _load_to_sleeper(pd.DataFrame(all_matchups), "matchup", engine)
     if all_draft_picks:

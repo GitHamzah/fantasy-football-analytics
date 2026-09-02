@@ -1,0 +1,41 @@
+version: 2
+
+sources:
+  - name: sleeper
+    description: >
+      Hamzah's Sleeper fantasy leagues, landed by src.ingest.sleeper. Read-only
+      snapshots of the free Sleeper API; refreshed by re-running the ingestion.
+      player_map is the bridge to nflverse (sleeper_id -> gsis_id, augmented
+      with the DynastyProcess crosswalk).
+    schema: sleeper
+    tables:
+      - name: league
+        columns:
+          - name: league_id
+            tests:
+              - not_null
+              - unique
+      - name: user
+        description: "League managers. USER is reserved in T-SQL, so quoted."
+        quoting:
+          identifier: true
+      - name: roster
+      - name: roster_player
+        description: "One row per (league, roster, player); is_starter flags the lineup."
+        columns:
+          - name: sleeper_id
+            tests:
+              - not_null
+      - name: matchup
+      - name: draft_pick
+      - name: transaction
+        description: "TRANSACTION is reserved in T-SQL, so quoted."
+        quoting:
+          identifier: true
+      - name: player_map
+        description: "Sleeper player universe with gsis_id bridge (gsis_source: sleeper | ff_playerids)."
+        columns:
+          - name: sleeper_id
+            tests:
+              - not_null
+              - unique
