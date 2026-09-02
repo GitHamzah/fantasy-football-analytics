@@ -35,7 +35,7 @@ def _rating(score) -> str:
 def get_schedule_adjusted(
     season: int = Query(2026, description="Projection season"),
     position: str | None = Query(None, description="QB, RB, WR or TE"),
-    limit: int = Query(20, ge=1, le=100),
+    limit: int = Query(20, ge=1, le=500),
 ):
     """Season-total scheme-adjusted projections, best schedules first."""
     if season != 2026:
