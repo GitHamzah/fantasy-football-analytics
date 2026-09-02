@@ -63,6 +63,8 @@ MART_TABLES = [
     ("mart.my_roster", "my_roster"),
     ("mart.league_standings", "league_standings"),
     ("mart.league_matchup", "league_matchup"),
+    ("mart.schedule_projection", "schedule_projection"),
+    ("mart.season_projection", "season_projection"),
 ]
 
 

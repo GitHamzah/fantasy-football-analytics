@@ -163,3 +163,19 @@ models:
       - name: league_id
         tests:
           - not_null
+
+  - name: mart_schedule_projection
+    description: >
+      Scheme-adjusted 2026 weekly projections: player x game, weighting 2025 per-shell production by the opponent's 2025 shell mix.
+    columns:
+      - name: player_id
+        tests:
+          - not_null
+
+  - name: mart_season_projection
+    description: >
+      Season rollup of schedule_projection: one row per player with totals and average matchup score.
+    columns:
+      - name: player_id
+        tests:
+          - not_null
