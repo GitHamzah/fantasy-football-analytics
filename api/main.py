@@ -6,7 +6,7 @@ and AI-powered analysis from a SQL Server warehouse.
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import players, stats, leaders, ai, analytics, projections, advanced, formations, matchups, leagues, schedule_projections
+from routers import players, stats, leaders, ai, analytics, projections, advanced, formations, matchups, leagues, schedule_projections, game_matchups
 
 app = FastAPI(
     title="Fantasy Football Analytics API",
@@ -38,6 +38,7 @@ app.include_router(formations.router)
 app.include_router(matchups.router)
 app.include_router(leagues.router)
 app.include_router(schedule_projections.router)
+app.include_router(game_matchups.router)
 app.include_router(ai.router)
 
 
