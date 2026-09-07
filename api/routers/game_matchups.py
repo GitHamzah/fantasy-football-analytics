@@ -226,9 +226,12 @@ GROUPS = [
 ]
 
 
-def _grade_side(off_team: str, def_team: str, shell_mix: dict, ctx: dict) -> list[dict]:
-    off_roster = get_formation_roster(team=off_team, season=STAT_SEASON)["players"]
-    def_roster = get_def_formation_roster(team=def_team, season=STAT_SEASON)["players"]
+def _grade_side(off_team: str, def_team: str, shell_mix: dict, ctx: dict,
+                roster_season: int = STAT_SEASON) -> list[dict]:
+    # Rosters follow the requested season (2026 falls back to current team
+    # assignments); every grading stat still comes from STAT_SEASON.
+    off_roster = get_formation_roster(team=off_team, season=roster_season)["players"]
+    def_roster = get_def_formation_roster(team=def_team, season=roster_season)["players"]
 
     skill_ids = [
         p["player_id"]
@@ -488,8 +491,8 @@ def get_game_matchup(
         raise HTTPException(404, f"No defensive tendency data for {missing}")
 
     try:
-        home_groups = _grade_side(home, away, mixes[away], ctx)
-        away_groups = _grade_side(away, home, mixes[home], ctx)
+        home_groups = _grade_side(home, away, mixes[away], ctx, roster_season=season)
+        away_groups = _grade_side(away, home, mixes[home], ctx, roster_season=season)
     except HTTPException as e:
         raise HTTPException(404, f"Roster data missing: {e.detail}")
 

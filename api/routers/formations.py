@@ -197,6 +197,53 @@ def get_league_formations(
 _ROSTER_SLOTS = {"QB": 1, "RB": 2, "WR": 4, "TE": 2}
 
 
+def _current_roster_fallback(team: str, season: int, positions: tuple) -> list[dict]:
+    """Roster candidates for a season with no game data yet (2026 pre-kickoff):
+    dim_player current_team, ranked by PRIOR-season league-wide usage.
+
+    current_team alone is far too loose (nflverse keeps ~190 'current' skill
+    players per team across practice squads and stale rows), and dim_player
+    has no years_exp column - so last season's games/touches/tackles carry the
+    ranking, with rookie_year as the experience tiebreak. A player's 2025
+    usage counts wherever they played it; that is exactly what makes traded
+    starters rank correctly on their new team.
+    """
+    prior = season - 1
+    pos_list = ",".join(f"'{p}'" for p in positions)
+    rows = execute_query(f"""
+        SELECT
+            d.gsis_id                                   AS player_id,
+            d.display_name                              AS name,
+            d.position,
+            COALESCE(u.games, 0)                        AS games,
+            COALESCE(u.touches, 0)                      AS touches,
+            COALESCE(u.involvement, 0)                  AS involvement,
+            COALESCE(:season - d.rookie_year, 0)        AS exp
+        FROM mart.dim_player d
+        LEFT JOIN (
+            SELECT gsis_id,
+                   COUNT(DISTINCT week) AS games,
+                   SUM(COALESCE(attempts, 0) + COALESCE(carries, 0)
+                       + COALESCE(targets, 0)) AS touches,
+                   SUM(COALESCE(def_total_tackles, 0)
+                       + COALESCE(def_sacks, 0)) AS involvement
+            FROM mart.fact_player_week
+            WHERE season = :prior AND season_type = 'REG'
+            GROUP BY gsis_id
+        ) u ON u.gsis_id = d.gsis_id
+        WHERE d.current_team = :team
+          AND d.status = 'ACT'
+          AND d.position IN ({pos_list})
+    """, {"team": team, "season": season, "prior": prior})
+    # Usage first, then experience - experience alone would start a
+    # 15-year journeyman over a sophomore starter.
+    rows.sort(key=lambda r: (int(r["games"] or 0),
+                             float(r["touches"] or 0) + float(r["involvement"] or 0),
+                             int(r["exp"] or 0)),
+              reverse=True)
+    return rows
+
+
 @router.get("/formations/roster")
 def get_formation_roster(
     team: str = Query(..., description="Team abbreviation, e.g. KC"),
@@ -229,6 +276,10 @@ def get_formation_roster(
         GROUP BY f.gsis_id, COALESCE(d.display_name, f.display_name), f.position
         ORDER BY f.position, COUNT(DISTINCT f.week) DESC
     """, {"season": season, "team": team})
+
+    if not rows:
+        # Season not played yet: current team assignments, prior-year usage.
+        rows = _current_roster_fallback(team, season, ("QB", "RB", "WR", "TE"))
 
     if not rows:
         raise HTTPException(404, f"No roster data for {team} in {season}")
@@ -285,17 +336,8 @@ def _offensive_line(team: str, season: int) -> list[dict]:
     """, {"season": season, "team": team})
 
     if not rows:
-        rows = execute_query("""
-            SELECT
-                d.gsis_id       AS player_id,
-                d.display_name  AS name,
-                d.position,
-                0               AS games
-            FROM mart.dim_player d
-            WHERE d.current_team = :team
-              AND d.position IN ('C', 'G', 'T', 'OL', 'OT', 'OG')
-              AND d.status = 'ACT'
-        """, {"team": team})
+        rows = _current_roster_fallback(
+            team, season, ("C", "G", "T", "OL", "OT", "OG"))
 
     ranked = sorted(rows, key=lambda r: int(r["games"] or 0), reverse=True)
 
@@ -495,18 +537,8 @@ def get_def_formation_roster(
     """.replace('"', "'"), {"season": season, "team": team})
 
     if not rows:
-        rows = execute_query(f"""
-            SELECT
-                d.gsis_id       AS player_id,
-                d.display_name  AS name,
-                d.position,
-                0               AS games,
-                0               AS involvement
-            FROM mart.dim_player d
-            WHERE d.current_team = :team
-              AND d.position IN {all_positions!r}
-              AND d.status = 'ACT'
-        """.replace('"', "'"), {"team": team})
+        # Season not played yet: current team assignments, prior-year usage.
+        rows = _current_roster_fallback(team, season, all_positions)
 
     if not rows:
         raise HTTPException(404, f"No defensive roster data for {team} in {season}")
