@@ -7,7 +7,6 @@ Hamzah Lydick (Doinworqson on Sleeper)
 - Senior BI professional, DFW (Carrollton, TX)
 - U.S. Army Veteran
 - M.S. Business Analytics (East Texas A&M), B.S. Accounting (UT Dallas)
-- Email: Hamzlydick@gmail.com
 - LinkedIn: https://www.linkedin.com/in/hamzahlydick/
 - GitHub: https://github.com/GitHamzah
 
@@ -36,7 +35,7 @@ UptimeRobot pings the Render API every 5 minutes to prevent cold starts.
 ```
 nflverse + PFR + Sleeper API
     -> Python ingestion (src/ingest/)
-    -> SQL Server (Docker on NAS at 192.168.1.119:1433, db: FantasyFootball, user: sa)
+    -> SQL Server (Docker on NAS, db: FantasyFootball)
     -> dbt Core (staging views -> warehouse tables -> mart views/tables)
     -> sync_to_neon.py -> Neon Postgres (production DB for API)
     -> FastAPI (Render)
@@ -54,9 +53,11 @@ nflverse + PFR + Sleeper API
 - Config: config/config.yaml (gitignored)
 
 **Neon Postgres (production):**
-- Connection: postgresql://neondb_owner:npg_oDJIvf34uFkg@ep-solitary-sunset-ay123kqv.c-5.us-east-2.aws.neon.tech/neondb?sslmode=require
-- Set via: $env:NEON_DATABASE_URL (PowerShell) or NEON_DATABASE_URL env var
+- Connection string stored in environment variable NEON_DATABASE_URL
+- Set via: $env:NEON_DATABASE_URL in PowerShell
 - Tables are in public schema (no mart. prefix)
+- Obtain the connection string from https://console.neon.tech project settings
+- NEVER commit this value to the repo
 
 **Render env vars:**
 - DATABASE_URL (Neon connection string)
@@ -97,7 +98,7 @@ Note: sleeper.[user] and sleeper.[transaction] are reserved SQL words - use brac
 ### Staging Layer (dbt views)
 - stg_player_stats, stg_players, stg_schedules, stg_rosters_weekly
 - stg_pfr_pass, stg_pfr_rush, stg_pfr_rec, stg_pfr_def
-- stg_participation (with offense_personnel parser + defense_personnel parser + coverage_shell)
+- stg_participation (with offense/defense personnel parsers + coverage_shell)
 - stg_pbp
 - stg_sleeper_roster, stg_sleeper_matchup, stg_sleeper_draft
 
@@ -262,8 +263,8 @@ Sleeper is separate: `python -m src.ingest.sleeper`
 # 1. Build dbt
 cd dbt && dbt build && cd ..
 
-# 2. Sync to Neon
-$env:NEON_DATABASE_URL = "postgresql://neondb_owner:npg_oDJIvf34uFkg@ep-solitary-sunset-ay123kqv.c-5.us-east-2.aws.neon.tech/neondb?sslmode=require"
+# 2. Sync to Neon (get connection string from Neon console)
+$env:NEON_DATABASE_URL = "your_neon_connection_string_here"
 python sync_to_neon.py
 
 # 3. Push API (triggers Render deploy)
